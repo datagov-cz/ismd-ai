@@ -1,0 +1,79 @@
+from fastapi import APIRouter, HTTPException, status, Path
+from services.PropertySuggestionService import PropertySuggestionService
+from uuid import UUID
+from typing import List
+
+from model.api.property_suggestion import (
+    StartPropertySuggestionsTopKExtractionJobRequest,
+    StartPropertySuggestionsJobResponse,
+    PropertySuggestionsJobStatusResponse
+)
+from controllers._utils import (
+    _translate_api_conceptual_model_to_domain_conceptual_model,
+    _translate_domain_to_api_attribute_suggestion,
+    _translate_domain_to_api_relationship_suggestion
+)
+
+def get_property_suggestion_router(service: PropertySuggestionService) -> APIRouter:
+    router = APIRouter()
+
+    @router.post(
+        "/legal-acts/{year}/{number}/{date}/property-suggestions-top-k-extraction-jobs",
+        status_code=status.HTTP_202_ACCEPTED,
+        response_model=StartPropertySuggestionsJobResponse,
+        summary="Start a top-K property (attribute and relationship) suggestions extraction job",
+        description="Starts a job to extract the top-K property (attribute and relationships) suggestions for specific structural elements of a legal act and for a specific class. After the job is started, it will run asynchronously and can be checked for status using the job ID."
+    )
+    async def start_property_suggestions_top_k_extraction_job(
+        request: StartPropertySuggestionsTopKExtractionJobRequest,
+        number: int = Path(..., description="Official number of the legal act"),
+        year: int = Path(..., description="Year of the legal act"),
+        date: str = Path(..., description="Date identifying the version of the legal act (YYYY-MM-DD)")
+    ) -> StartPropertySuggestionsJobResponse:
+        job = await service.start_property_suggestions_top_k_extraction_job(
+            number, year, date,
+            request.k,
+            request.structural_element_ids,
+            str(request.selected_class_id),
+            request.context_text,
+            _translate_api_conceptual_model_to_domain_conceptual_model(request.known_conceptual_model)
+        )
+        return StartPropertySuggestionsJobResponse(
+            job_id=job.job_id,
+            selected_class_id=job.selected_class_id,
+            status=job.status
+        )
+
+    @router.get(
+        "/legal-acts/{year}/{number}/{date}/property-suggestions-jobs/{job_id}",
+        response_model=PropertySuggestionsJobStatusResponse,
+        summary="Get property (attribute and relationship) suggestion job status",
+        description="Get the status of a property (attribute and relationship) suggestions job by job ID received when starting the job. The status contains the status information about the job and the list of new property (attribute and relationship) suggestions extracted since the job was started. After the job is completed, no more suggestions will be added to this list."
+    )
+    def get_property_suggestion_job_status(
+        number: int = Path(..., description="Official number of the legal act"),
+        year: int = Path(..., description="Year of the legal act"),
+        date: str = Path(..., description="Date identifying the version of the legal act (YYYY-MM-DD)"),
+        job_id: UUID = Path(..., description="Job ID")
+    ) -> PropertySuggestionsJobStatusResponse:
+        """
+        Get the status of the given property (attribute and relationship) suggestions job.
+        """
+        job = service.get_job_status(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        attr_suggestions = [
+            _translate_domain_to_api_attribute_suggestion(s) for s in (job.attribute_suggestions or [])
+        ]
+        rel_suggestions = [
+            _translate_domain_to_api_relationship_suggestion(s) for s in (job.relationship_suggestions or [])
+        ]
+        return PropertySuggestionsJobStatusResponse(
+            job_id=job.job_id,
+            selected_class_id=job.selected_class_id,
+            status=job.status,
+            new_attribute_suggestions=attr_suggestions,
+            new_relationship_suggestions=rel_suggestions
+        )
+
+    return router
