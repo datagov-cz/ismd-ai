@@ -161,7 +161,7 @@ Retrieves the status and results of a class suggestions job.
 POST /legal-acts/{year}/{number}/{date}/property-suggestions-top-k-extraction-jobs
 ```
 
-Starts a job to extract attribute and relationship suggestions for a specific class.
+Starts a job to extract attribute suggestions for a specific class.
 
 **Request Body:**
 ```json
@@ -178,7 +178,7 @@ Starts a job to extract attribute and relationship suggestions for a specific cl
 ```
 
 **Key Parameters:**
-- `selected_class_id` (required): ID of the class for which to generate property suggestions
+- `selected_class_id` (required): ID of the class for which to generate attribute suggestions
 - Other parameters same as class suggestions
 
 **Response (202 Accepted):**
@@ -225,44 +225,121 @@ GET /legal-acts/{year}/{number}/{date}/property-suggestions-jobs/{job_id}
       "occurences": [...],
       "references": [...]
     }
-  ],
-  "new_relationship_suggestions": [
-    {
-      "id": "rel_001",
-      "type": "http://example.org/Relationship",
-      "name": {
-        "@value": "owns",
-        "@language": "en"
-      },
-      "definition": {
-        "@value": "Relationship between owner and property",
-        "@language": "en"
-      },
-      "explanation": {
-        "@value": "Indicates ownership relationship",
-        "@language": "en"
-      },
-      "mediatesClass": [
-        {
-          "id": "property_class_001",
-          "type": "http://example.org/Class",
-          "name": {
-            "@value": "Property",
-            "@language": "en"
-          }
-        }
-      ],
-      "legal_act": {
-        "id": "act_123",
-        "type": "http://example.org/LegalAct",
-        "official_number": "123/2023"
-      },
-      "occurences": [...],
-      "references": [...]
-    }
   ]
 }
 ```
+
+### Non-Legal Text Suggestions
+
+#### Start Non-Legal Class Suggestions Job
+```http
+POST /nonlegal-text/class-suggestions-top-k-extraction-jobs
+```
+
+Starts an asynchronous job to extract class suggestions from a provided non-legal text.
+
+**Header Parameters:**
+- `text` (string): Non-legal text to process
+
+**Request Body:** Same as Start Class Suggestions Job.
+
+**Response (202 Accepted):** Same as Start Class Suggestions Job.
+
+#### Get Non-Legal Class Suggestions Job Status
+```http
+GET /nonlegal-text/class-suggestions-jobs/{job_id}
+```
+
+Retrieves the status and results of a non-legal class suggestions job.
+
+**Header Parameters:**
+- `text` (string): Non-legal text to process
+
+**Path Parameters:**
+- `job_id` (UUID): Job identifier from the start response
+
+**Response:** Same as Get Class Suggestions Job Status.
+
+#### Start Non-Legal Property Suggestions Job
+```http
+POST /nonlegal-text/property-suggestions-top-k-extraction-jobs
+```
+
+Starts a job to extract attribute suggestions from a provided non-legal text for a specific class.
+
+**Header Parameters:**
+- `text` (string): Non-legal text to process
+
+**Request Body:** Same as Start Property Suggestions Job.
+
+**Response (202 Accepted):** Same as Start Property Suggestions Job.
+
+#### Get Non-Legal Property Suggestions Job Status
+```http
+GET /nonlegal-text/property-suggestions-jobs/{job_id}
+```
+
+Retrieves the status and results of a non-legal attribute suggestions job.
+
+**Header Parameters:**
+- `text` (string): Non-legal text to process
+
+**Path Parameters:**
+- `job_id` (UUID): Job identifier from the start response
+
+**Response:** Same as Get Property Suggestions Job Status.
+
+#### Start Non-Legal Relationship Suggestions Job
+```http
+POST /nonlegal-text/relationship-suggestions-top-k-extraction-jobs
+```
+
+Starts a job to extract relationship suggestions from a provided non-legal text for a specific class.
+
+**Header Parameters:**
+- `text` (string): Non-legal text to process
+
+**Request Body:**
+```json
+{
+  "k": 10,
+  "selected_class_id": "class_001",
+  "structural_element_ids": ["§1", "§2"],
+  "context_text": "Focus on ownership-related relationships",
+  "known_conceptual_model": {
+    "classes": [...],
+    "relationships": [...]
+  }
+}
+```
+
+**Key Parameters:**
+- `selected_class_id` (required): ID of the class for which to generate relationship suggestions
+- Other parameters same as class suggestions
+
+**Response (202 Accepted):**
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440002",
+  "selected_class_id": "class_001",
+  "status": "in_progress"
+}
+```
+
+#### Get Non-Legal Relationship Suggestions Job Status
+```http
+GET /nonlegal-text/relationship-suggestions-jobs/{job_id}
+```
+
+Retrieves the status and results of a non-legal relationship suggestions job.
+
+**Header Parameters:**
+- `text` (string): Non-legal text to process
+
+**Path Parameters:**
+- `job_id` (UUID): Job identifier from the start response
+
+**Response:** Same as the relationship suggestions job status response.
 
 ### Feedback System
 
