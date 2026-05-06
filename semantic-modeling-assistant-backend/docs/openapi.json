@@ -5,175 +5,6 @@
     "version": "0.1.0"
   },
   "paths": {
-    "/nonlegal-text/class-suggestions-top-k-extraction-jobs": {
-      "post": {
-        "summary": "Start a new top-K class suggestions extraction job",
-        "description": "Starts a new job to extract the top-K class suggestions for a nonlegal text. After the job is started, it will run asynchronously and can be checked for status using the job ID.",
-        "operationId": "start_class_suggestions_top_k_extraction_nonlegal__class_suggestions_top_k_extraction_jobs_post",
-        "parameters": [
-          {
-            "name": "text",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Text"
-            }
-          },
-          {
-            "name": "user-id",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "User-Id"
-            }
-          },
-          {
-            "name": "password",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Password"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StartClassSuggestionsTopKExtractionJobRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/StartClassSuggestionsJobResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string",
-                      "example": "You have reached the maximum usage available to you. Please try again later."
-                    }
-                  },
-                  "required": [
-                    "detail"
-                  ],
-                  "title": "UnauthorizedError"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/nonlegal-text/class-suggestions-jobs/{job_id}": {
-      "get": {
-        "summary": "Get job status",
-        "description": "Get the status of a class suggestions job by job ID received when starting the job.The status contains the status information about the job and the list of new class suggestions extracted since the job was started. After the job is completed, no more suggestions will be added to this list.",
-        "operationId": "get_class_suggestion_job_status_nonlegal__class_suggestions_jobs__job_id__get",
-        "parameters": [
-          {
-            "name": "job_id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "description": "Unique identifier of the job",
-              "title": "Job Id"
-            },
-            "description": "Unique identifier of the job"
-          },
-          {
-            "name": "user-id",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "User-Id"
-            }
-          },
-          {
-            "name": "password",
-            "in": "header",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Password"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ClassSuggestionsJobStatusResponse"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "detail": {
-                      "type": "string",
-                      "example": "You have reached the maximum usage available to you. Please try again later."
-                    }
-                  },
-                  "required": [
-                    "detail"
-                  ],
-                  "title": "UnauthorizedError"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/legal-acts/{year}/{number}/{date}/class-suggestions-top-k-extraction-jobs": {
       "post": {
         "summary": "Start a new top-K class suggestions extraction job",
@@ -400,11 +231,11 @@
         }
       }
     },
-    "/nonlegal-text/property-suggestions-top-k-extraction-jobs": {
+    "/nonlegal-text/class-suggestions-top-k-extraction-jobs": {
       "post": {
-        "summary": "Start a top-K attribute suggestions extraction job",
-        "description": "Starts a job to extract the top-K attribute suggestions for specific structural elements of a legal act and for a specific class. After the job is started, it will run asynchronously and can be checked for status using the job ID.",
-        "operationId": "start_property_suggestions_top_k_extraction_job_nonlegal__property_suggestions_top_k_extraction_jobs_post",
+        "summary": "Start a new top-K class suggestions extraction job",
+        "description": "Starts a new job to extract the top-K class suggestions for the provided non-legal text. After the job is started, it will run asynchronously and can be checked for status using the job ID.",
+        "operationId": "start_class_suggestions_top_k_extraction_job_nonlegal_text__class_suggestions_top_k_extraction_jobs_post",
         "parameters": [
           {
             "name": "text",
@@ -412,8 +243,192 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Non-legal text to process",
               "title": "Text"
+            },
+            "description": "Non-legal text to process"
+          },
+          {
+            "name": "user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User-Id"
             }
+          },
+          {
+            "name": "password",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Password"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartClassSuggestionsTopKExtractionJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartClassSuggestionsJobResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "example": "You have reached the maximum usage available to you. Please try again later."
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ],
+                  "title": "UnauthorizedError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nonlegal-text/class-suggestions-jobs/{job_id}": {
+      "get": {
+        "summary": "Get job status",
+        "description": "Get the status of a class suggestions job by job ID received when starting the job.The status contains the status information about the job and the list of new class suggestions extracted since the job was started. After the job is completed, no more suggestions will be added to this list.",
+        "operationId": "get_class_suggestion_job_status_nonlegal_text__class_suggestions_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Non-legal text to process",
+              "title": "Text"
+            },
+            "description": "Non-legal text to process"
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Unique identifier of the job",
+              "title": "Job Id"
+            },
+            "description": "Unique identifier of the job"
+          },
+          {
+            "name": "user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User-Id"
+            }
+          },
+          {
+            "name": "password",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Password"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClassSuggestionsJobStatusResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "example": "You have reached the maximum usage available to you. Please try again later."
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ],
+                  "title": "UnauthorizedError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nonlegal-text/property-suggestions-top-k-extraction-jobs": {
+      "post": {
+        "summary": "Start a top-K attribute suggestions extraction job",
+        "description": "Starts a job to extract the top-K attribute suggestions for the provided non-legal text and for a specific class. After the job is started, it will run asynchronously and can be checked for status using the job ID.",
+        "operationId": "start_property_suggestions_top_k_extraction_job_nonlegal_text__property_suggestions_top_k_extraction_jobs_post",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Non-legal text to process",
+              "title": "Text"
+            },
+            "description": "Non-legal text to process"
           },
           {
             "name": "user-id",
@@ -451,6 +466,310 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/StartPropertySuggestionsJobResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "example": "You have reached the maximum usage available to you. Please try again later."
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ],
+                  "title": "UnauthorizedError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nonlegal-text/property-suggestions-jobs/{job_id}": {
+      "get": {
+        "summary": "Get property (attribute and relationship) suggestion job status",
+        "description": "Get the status of a property (attribute and relationship) suggestions job by job ID received when starting the job. The status contains the status information about the job and the list of new property (attribute and relationship) suggestions extracted since the job was started. After the job is completed, no more suggestions will be added to this list.",
+        "operationId": "get_property_suggestion_job_status_nonlegal_text__property_suggestions_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Non-legal text to process",
+              "title": "Text"
+            },
+            "description": "Non-legal text to process"
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Job ID",
+              "title": "Job Id"
+            },
+            "description": "Job ID"
+          },
+          {
+            "name": "user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User-Id"
+            }
+          },
+          {
+            "name": "password",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Password"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PropertySuggestionsJobStatusResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "example": "You have reached the maximum usage available to you. Please try again later."
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ],
+                  "title": "UnauthorizedError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nonlegal-text/relationship-suggestions-top-k-extraction-jobs": {
+      "post": {
+        "summary": "Start a top-K relationship suggestions extraction job",
+        "description": "Starts a job to extract the top-K relationships suggestions for the provided non-legal text and for a specific class. After the job is started, it will run asynchronously and can be checked for status using the job ID.",
+        "operationId": "start_relationship_suggestions_top_k_extraction_job_nonlegal_text__relationship_suggestions_top_k_extraction_jobs_post",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Non-legal text to process",
+              "title": "Text"
+            },
+            "description": "Non-legal text to process"
+          },
+          {
+            "name": "user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User-Id"
+            }
+          },
+          {
+            "name": "password",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Password"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRelationshipSuggestionsTopKExtractionJobRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartRelationshipSuggestionsJobResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "example": "You have reached the maximum usage available to you. Please try again later."
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ],
+                  "title": "UnauthorizedError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/nonlegal-text/relationship-suggestions-jobs/{job_id}": {
+      "get": {
+        "summary": "Get relationship suggestion job status",
+        "description": "Get the status of a relationship suggestions job by job ID received when starting the job. The status contains the status information about the job and the list of new relationship suggestions extracted since the job was started. After the job is completed, no more suggestions will be added to this list.",
+        "operationId": "get_relationship_suggestion_job_status_nonlegal_text__relationship_suggestions_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "text",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Non-legal text to process",
+              "title": "Text"
+            },
+            "description": "Non-legal text to process"
+          },
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Job ID",
+              "title": "Job Id"
+            },
+            "description": "Job ID"
+          },
+          {
+            "name": "user-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User-Id"
+            }
+          },
+          {
+            "name": "password",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Password"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationshipSuggestionsJobStatusResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "detail": {
+                      "type": "string",
+                      "example": "You have reached the maximum usage available to you. Please try again later."
+                    }
+                  },
+                  "required": [
+                    "detail"
+                  ],
+                  "title": "UnauthorizedError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
