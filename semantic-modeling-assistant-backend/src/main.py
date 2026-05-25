@@ -9,7 +9,7 @@ from controllers.DislikedSuggestionController import get_disliked_suggestion_rou
 
 from infrastructure.repositories.jobs.JsonLineSuggestionJobRepository import JsonLineSuggestionJobRepository
 from infrastructure.repositories.suggestions.FileSystemSuggestionRepository import FileSystemSuggestionRepository
-from infrastructure.llm.SuggestionGenerator_OpenAI_Streamed import SuggestionGenerator_OpenAI_Streamed
+from infrastructure.llm.SuggestionGenerator_AnyLLM import SuggestionGenerator_AnyLLM
 from infrastructure.llm.prompt_constructors.PromptConstructor_Methodology_PromptsInEnglish import PromptConstructor_Methodology_PromptsInEnglish
 
 from executors.ClassSuggestionExecutor import ClassSuggestionExecutor
@@ -48,11 +48,12 @@ def check_user_credentials(user_id: str = Header(...), password: str = Header(..
             return True
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
 
-def set_app_Methodology_PromptsInEnglish(model: str):
-  job_repo = JsonLineSuggestionJobRepository(f"{data_directory}/logs/{model}/methodology_prompts_in_english_suggestion_jobs.jsonl")
-  suggestion_repo = FileSystemSuggestionRepository(storage_folder= f"{data_directory}/global_class_suggestions/{model}/v2/long")
+def set_app_Methodology_PromptsInEnglish(model: str, provider: str):
+  llm_identifier = f"{provider}/{model}"
+  job_repo = JsonLineSuggestionJobRepository(f"{data_directory}/logs/{llm_identifier}/methodology_prompts_in_english_suggestion_jobs.jsonl")
+  suggestion_repo = FileSystemSuggestionRepository(storage_folder= f"{data_directory}/global_class_suggestions/{llm_identifier}/v2/long")
   prompt_constructor = PromptConstructor_Methodology_PromptsInEnglish()
-  generator = SuggestionGenerator_OpenAI_Streamed(prompt_constructor, model=model, language="cs")
+  generator = SuggestionGenerator_AnyLLM(prompt_constructor, model=model, provider=provider, language="cs")
 
   class_executor = ClassSuggestionExecutor(generator)
   class_service = ClassSuggestionService(job_repo, suggestion_repo, class_executor)
@@ -62,7 +63,7 @@ def set_app_Methodology_PromptsInEnglish(model: str):
   property_service = PropertySuggestionService(job_repo, suggestion_repo, property_executor)
   property_router = get_property_suggestion_router(property_service)
 
-  accepted_repo = SuggestionEvaluationRepository(f"{data_directory}/logs/{model}/methodology_prompts_in_english_accepted_suggestions.jsonl")
+  accepted_repo = SuggestionEvaluationRepository(f"{data_directory}/logs/{llm_identifier}/methodology_prompts_in_english_accepted_suggestions.jsonl")
   accepted_service = AcceptedSuggestionService(accepted_repo)
   liked_service = LikedSuggestionService(accepted_repo)
   disliked_service = DislikedSuggestionService(accepted_repo)
@@ -79,12 +80,15 @@ def set_app_Methodology_PromptsInEnglish(model: str):
 
 app = FastAPI(dependencies=[Depends(check_user_credentials)])
 
-#(class_router, attribute_router, relationship_router, property_router) = set_app_Methodology_PromptsInEnglish("gpt-4.1-mini")
+llm_provider = os.getenv("LLM_PROVIDER", "openai")
+llm_model = os.getenv("LLM_MODEL", "gpt-4.1")
+
+#(class_router, attribute_router, relationship_router, property_router) = set_app_Methodology_PromptsInEnglish("gpt-4.1-mini", "openai")
 (class_router,
  property_router,
  accepted_router,
  liked_router,
- disliked_router,) = set_app_Methodology_PromptsInEnglish("gpt-4.1")
+ disliked_router,) = set_app_Methodology_PromptsInEnglish(llm_model, llm_provider)
 
 app.include_router(class_router)
 app.include_router(property_router)

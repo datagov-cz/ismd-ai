@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 from typing import Optional, List
 
 class LocalSemanticModelClass(BaseModel):
@@ -64,4 +64,7 @@ class ExtractedProperty(BaseModel):
   references: Optional[List[str]] = Field(description="references")
 
 class PropertyExtractionResult(BaseModel):
-  extracted_items: List[ExtractedProperty] = Field(description="a list of extracted properties")
+  extracted_properties: List[ExtractedProperty] = Field(
+    description="a list of extracted properties",
+    validation_alias=AliasChoices("extracted_properties", "extracted-properties", "extracted_items")
+  )

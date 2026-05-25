@@ -9,8 +9,8 @@ The Semantic Modeling Assistant Backend leverages Large Language Models (LLMs) t
 ### Key Features
 
 - **Class Suggestion Extraction**: Identifies and suggests classes (entities) from legal document paragraphs
-- **Property Suggestion Extraction**: Generates attribute and relationship suggestions for specific classes
-- **Asynchronous Processing**: Long-running jobs with streaming results
+- **Property Suggestion Extraction**: Generates attribute suggestions for specific classes
+- **Asynchronous Processing**: Long-running jobs with persisted results
 - **Multilingual Support**: Handles multilingual names, definitions, and explanations
 - **Feedback System**: Tracks accepted, liked, and disliked suggestions for model improvement
 - **Context-Aware Processing**: Considers existing conceptual models when generating new suggestions
@@ -18,13 +18,26 @@ The Semantic Modeling Assistant Backend leverages Large Language Models (LLMs) t
 ## Technical Architecture
 
 ### LLM Integration
-The backend integrates with OpenAI's GPT models through a streaming interface that:
+The backend integrates with LLM providers through Mozilla.ai's `any-llm` package.
+Set the provider and model with environment variables:
+
+```bash
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4.1
+```
+
+Provider-specific credentials are read from the environment by `any-llm`, such as
+`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `MISTRAL_API_KEY`. You can also set
+`LLM_API_KEY` and `LLM_API_BASE` to pass an explicit key or compatible API base
+URL to the configured provider.
+
+The integration:
 - Processes legal text and extracts suggestions asynchronously
-- Streams results as they become available from the LLM to enable the client to process the stream of extracted suggestions
+- Uses typed structured outputs for class and property extraction
 
 ### Processing Constraints
 - **Context Window Limits**: Large legal documents may exceed LLM context windows
-- **Rate Limits**: Subject to OpenAI's tokens-per-minute limits
+- **Rate Limits**: Subject to the configured LLM provider's limits
 - **Processing Time**: Response times vary based on document complexity and LLM availability
 - **Job Rejection**: Requests may be rejected due to API provider limitations
 
@@ -529,19 +542,21 @@ Jobs may fail due to:
 ## Development Setup
 
 ### Prerequisites
-- Python 3.9+
-- OpenAI API key
+- Python 3.11+
+- API key for the configured LLM provider, unless using a local provider
 - Environment variables configured
 
 ### Dependencies
 Key dependencies include:
 - `fastapi`: Web framework
-- `openai`: LLM integration
+- `any-llm-sdk`: LLM provider integration
 - `pydantic`: Data validation
 - `uvicorn`: ASGI server
 
 ### Environment Variables
 ```bash
+LLM_PROVIDER=openai
+LLM_MODEL=gpt-4.1
 OPENAI_API_KEY=your-openai-api-key
 USER_KEYS=[{"user_id": "user1", "password": "pass1"}]
 DATA_DIRECTORY=optional-path-where-to-save-data
@@ -559,7 +574,7 @@ The API will be available at `http://localhost:8000` with automatic OpenAPI docu
 ## Limitations
 
 1. **Language Support**: Currently optimized for Czech legal documents
-2. **LLM Dependency**: Requires active OpenAI API connection
+2. **LLM Dependency**: Requires an active configured LLM provider connection
 3. **Binary Relationships**: Only supports binary relationships between classes
 4. **Processing Time**: Variable response times based on document complexity
 5. **Context Windows**: Limited by LLM provider context window sizes
