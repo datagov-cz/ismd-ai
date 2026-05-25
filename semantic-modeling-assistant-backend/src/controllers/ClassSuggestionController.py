@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request, status, Path
 from services.ClassSuggestionService import ClassSuggestionService
+from services.AuthenticationService import get_authenticated_user_id
 from services.TokenRateLimiter import DailyTokenLimitExceeded
 from uuid import UUID
 from typing import List
@@ -40,7 +41,7 @@ def get_class_suggestion_router(service: ClassSuggestionService) -> APIRouter:
                 request.structural_element_ids,
                 request.context_text,
                 _translate_api_conceptual_model_to_domain_conceptual_model(request.known_conceptual_model),
-                user_id=http_request.headers.get("user-id")
+                user_id=get_authenticated_user_id(http_request)
             )
         except DailyTokenLimitExceeded as exc:
             raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))

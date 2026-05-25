@@ -55,17 +55,28 @@ Get the authenticated user's current daily token usage:
 
 ```http
 GET /token-usage
-user-id: your-user-id
-password: your-password-or-api-key
+Authorization: Bearer <oidc-access-token>
 ```
 
 ## Authentication
 
-All API endpoints require authentication via HTTP headers:
+All API endpoints use the same authentication dependency. The API supports the existing static credential headers:
 
 ```http
 user-id: your-user-id
 password: your-password-or-api-key
+```
+
+For OAuth2/OIDC deployments such as Keycloak, the API can also resolve the user ID from a bearer token:
+
+```http
+Authorization: Bearer <oidc-access-token>
+```
+
+The token is expected to be validated by deployment infrastructure. This repository does not contain a Keycloak-specific implementation. The API reads the authenticated user ID from OIDC claims, using `sub` first and `preferred_username` second by default. Override the claim list with:
+
+```bash
+OIDC_USER_ID_CLAIMS=sub,preferred_username,email
 ```
 
 ## API Endpoints

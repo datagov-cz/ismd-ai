@@ -1,4 +1,6 @@
-from fastapi import FastAPI, Depends, Header, HTTPException, status
+from typing import Optional
+
+from fastapi import FastAPI, Depends, Header, Request
 from fastapi.staticfiles import StaticFiles
 
 from controllers.ClassSuggestionController import get_class_suggestion_router
@@ -21,6 +23,7 @@ from services.PropertySuggestionService import PropertySuggestionService
 from services.AcceptedSuggestionService import AcceptedSuggestionService
 from services.LikedSuggestionService import LikedSuggestionService
 from services.DislikedSuggestionService import DislikedSuggestionService
+from services.AuthenticationService import AuthenticationService
 from services.TokenRateLimiter import DailyTokenRateLimiter
 from infrastructure.repositories.accepted.AcceptedSuggestionRepository import SuggestionEvaluationRepository
 
@@ -43,13 +46,20 @@ else:
 data_directory = os.getenv("DATA_DIRECTORY", "data")
 static_director = os.getenv("STATIC_DIRECTORY")
 token_rate_limiter = DailyTokenRateLimiter.from_environment(data_directory)
+oidc_user_id_claims = [
+    claim.strip()
+    for claim in os.getenv("OIDC_USER_ID_CLAIMS", "sub,preferred_username").split(",")
+    if claim.strip()
+]
+authentication_service = AuthenticationService(USER_KEYS_LIST, oidc_user_id_claims)
 
-# Dependency to check user_id and password in headers
-def check_user_credentials(user_id: str = Header(...), password: str = Header(...)):
-    for user in USER_KEYS_LIST:
-        if user.get("user_id") == user_id and (user.get("password") == password or user.get("key") == password):
-            return True
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials.")
+def authenticate_request(
+    request: Request,
+    user_id: Optional[str] = Header(None),
+    password: Optional[str] = Header(None),
+    authorization: Optional[str] = Header(None),
+):
+    return authentication_service.authenticate(request, user_id, password, authorization)
 
 def set_app_Methodology_PromptsInEnglish(model: str, provider: str):
   llm_identifier = f"{provider}/{model}"
@@ -87,7 +97,7 @@ def set_app_Methodology_PromptsInEnglish(model: str, provider: str):
       disliked_router,
   )
 
-app = FastAPI(dependencies=[Depends(check_user_credentials)])
+app = FastAPI(dependencies=[Depends(authenticate_request)])
 
 llm_provider = os.getenv("LLM_PROVIDER", "openai")
 llm_model = os.getenv("LLM_MODEL", "gpt-4.1")
