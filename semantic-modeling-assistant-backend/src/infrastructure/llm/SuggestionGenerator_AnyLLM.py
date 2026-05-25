@@ -1,5 +1,7 @@
 import os
+import json
 import re
+import math
 from typing import AsyncGenerator, List, Optional
 from uuid import uuid4
 
@@ -8,6 +10,7 @@ from dotenv import load_dotenv
 
 from infrastructure.llm.SuggestionGeneratorPort import SuggestionGeneratorPort
 from infrastructure.llm.prompt_constructors import PromptConstructorPort
+from services.TokenRateLimiter import DailyTokenRateLimiter
 from model.domain.conceptual_model import (
     Class as DomainClass,
     ConceptualModel as DomainConceptualModel,
@@ -36,6 +39,7 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
         model: Optional[str] = None,
         provider: Optional[str] = None,
         language: str = "cs",
+        token_rate_limiter: Optional[DailyTokenRateLimiter] = None,
     ):
         self.prompt_constructor = prompt_constructor
         self.model = model or os.getenv("LLM_MODEL", "gpt-4.1")
@@ -43,6 +47,7 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
         self.language = language
         self.api_key = os.getenv("LLM_API_KEY")
         self.api_base = os.getenv("LLM_API_BASE")
+        self.token_rate_limiter = token_rate_limiter
 
     async def generate_top_k_class_suggestions(
         self,
@@ -51,6 +56,7 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
         structural_elements: List[LegalStructuralElement],
         context_text: Optional[str] = None,
         known_conceptual_model: Optional[DomainConceptualModel] = None,
+        user_id: Optional[str] = None,
     ) -> AsyncGenerator[GlobalClassSuggestion, None]:
         legal_text = self._build_legal_text(structural_elements)
         known_conceptual_model_text = None
@@ -66,7 +72,7 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
             known_conceptual_model_text,
         )
 
-        response = await self._completion(messages, ClassExtractionResult)
+        response = await self._completion(messages, ClassExtractionResult, user_id=user_id)
         class_extraction_result = response.choices[0].message.parsed
 
         global_class_suggestions = []
@@ -147,6 +153,7 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
         selected_class: DomainClass,
         context_text: Optional[str] = None,
         known_conceptual_model: Optional[DomainConceptualModel] = None,
+        user_id: Optional[str] = None,
     ) -> AsyncGenerator[
         tuple[str, GlobalAttributeSuggestion | GlobalRelationshipSuggestion], None
     ]:
@@ -171,6 +178,7 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
         response = await self._completion(
             messages,
             PropertyExtractionResult,
+            user_id=user_id,
             temperature=0,
             top_p=1,
             max_tokens=int(os.getenv("LLM_MAX_TOKENS", "2048")),
@@ -209,7 +217,7 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
             f"{selected_class.name.value} in the legal act {legal_act.officialNumber} completed."
         )
 
-    async def _completion(self, messages, response_format, **kwargs):
+    async def _completion(self, messages, response_format, user_id: Optional[str] = None, **kwargs):
         params = {
             "model": self.model,
             "provider": self.provider,
@@ -221,7 +229,69 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
             params["api_key"] = self.api_key
         if self.api_base:
             params["api_base"] = self.api_base
-        return await acompletion(**params)
+
+        reservation = None
+        if self.token_rate_limiter is not None:
+            reservation = self.token_rate_limiter.reserve(
+                user_id,
+                self._estimate_completion_tokens(messages, kwargs),
+            )
+        try:
+            response = await acompletion(**params)
+        except Exception:
+            if self.token_rate_limiter is not None:
+                self.token_rate_limiter.refund(reservation)
+            raise
+
+        if self.token_rate_limiter is not None:
+            self.token_rate_limiter.adjust(reservation, self._extract_total_tokens(response))
+        return response
+
+    def _estimate_completion_tokens(self, messages, kwargs) -> int:
+        prompt_text = json.dumps(messages, ensure_ascii=False, default=str)
+        prompt_tokens = max(math.ceil(len(prompt_text) / 4), 1)
+        max_output_tokens = (
+            kwargs.get("max_tokens")
+            or kwargs.get("max_completion_tokens")
+            or int(os.getenv("LLM_MAX_TOKENS", "2048"))
+        )
+        return prompt_tokens + int(max_output_tokens)
+
+    def _extract_total_tokens(self, response) -> Optional[int]:
+        usage = self._get_value(response, "usage")
+        if usage is None:
+            return None
+
+        total_tokens = self._first_int_value(
+            usage,
+            ["total_tokens", "totalTokens", "totalTokenCount"],
+        )
+        if total_tokens is not None:
+            return total_tokens
+
+        prompt_tokens = self._first_int_value(
+            usage,
+            ["prompt_tokens", "input_tokens", "promptTokens", "inputTokens"],
+        )
+        completion_tokens = self._first_int_value(
+            usage,
+            ["completion_tokens", "output_tokens", "completionTokens", "outputTokens"],
+        )
+        if prompt_tokens is not None and completion_tokens is not None:
+            return prompt_tokens + completion_tokens
+        return None
+
+    def _first_int_value(self, source, keys: list[str]) -> Optional[int]:
+        for key in keys:
+            value = self._get_value(source, key)
+            if value is not None:
+                return int(value)
+        return None
+
+    def _get_value(self, source, key: str):
+        if isinstance(source, dict):
+            return source.get(key)
+        return getattr(source, key, None)
 
     def _build_legal_text(self, structural_elements: List[LegalStructuralElement]) -> str:
         if len(structural_elements) == 0:

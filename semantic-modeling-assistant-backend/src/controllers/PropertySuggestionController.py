@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, status, Path
+from fastapi import APIRouter, HTTPException, Request, status, Path
 from services.PropertySuggestionService import PropertySuggestionService
+from services.TokenRateLimiter import DailyTokenLimitExceeded
 from uuid import UUID
 from typing import List
 
@@ -26,18 +27,23 @@ def get_property_suggestion_router(service: PropertySuggestionService) -> APIRou
     )
     async def start_property_suggestions_top_k_extraction_job(
         request: StartPropertySuggestionsTopKExtractionJobRequest,
+        http_request: Request,
         number: int = Path(..., description="Official number of the legal act"),
         year: int = Path(..., description="Year of the legal act"),
         date: str = Path(..., description="Date identifying the version of the legal act (YYYY-MM-DD)")
     ) -> StartPropertySuggestionsJobResponse:
-        job = await service.start_property_suggestions_top_k_extraction_job(
-            number, year, date,
-            request.k,
-            request.structural_element_ids,
-            str(request.selected_class_id),
-            request.context_text,
-            _translate_api_conceptual_model_to_domain_conceptual_model(request.known_conceptual_model)
-        )
+        try:
+            job = await service.start_property_suggestions_top_k_extraction_job(
+                number, year, date,
+                request.k,
+                request.structural_element_ids,
+                str(request.selected_class_id),
+                request.context_text,
+                _translate_api_conceptual_model_to_domain_conceptual_model(request.known_conceptual_model),
+                user_id=http_request.headers.get("user-id")
+            )
+        except DailyTokenLimitExceeded as exc:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
         return StartPropertySuggestionsJobResponse(
             job_id=job.job_id,
             selected_class_id=job.selected_class_id,

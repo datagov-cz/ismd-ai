@@ -6,6 +6,7 @@ from controllers.PropertySuggestionController import get_property_suggestion_rou
 from controllers.AcceptedSuggestionController import get_accepted_suggestion_router
 from controllers.LikedSuggestionController import get_liked_suggestion_router
 from controllers.DislikedSuggestionController import get_disliked_suggestion_router
+from controllers.TokenUsageController import get_token_usage_router
 
 from infrastructure.repositories.jobs.JsonLineSuggestionJobRepository import JsonLineSuggestionJobRepository
 from infrastructure.repositories.suggestions.FileSystemSuggestionRepository import FileSystemSuggestionRepository
@@ -20,6 +21,7 @@ from services.PropertySuggestionService import PropertySuggestionService
 from services.AcceptedSuggestionService import AcceptedSuggestionService
 from services.LikedSuggestionService import LikedSuggestionService
 from services.DislikedSuggestionService import DislikedSuggestionService
+from services.TokenRateLimiter import DailyTokenRateLimiter
 from infrastructure.repositories.accepted.AcceptedSuggestionRepository import SuggestionEvaluationRepository
 
 import os
@@ -40,6 +42,7 @@ else:
 
 data_directory = os.getenv("DATA_DIRECTORY", "data")
 static_director = os.getenv("STATIC_DIRECTORY")
+token_rate_limiter = DailyTokenRateLimiter.from_environment(data_directory)
 
 # Dependency to check user_id and password in headers
 def check_user_credentials(user_id: str = Header(...), password: str = Header(...)):
@@ -53,14 +56,20 @@ def set_app_Methodology_PromptsInEnglish(model: str, provider: str):
   job_repo = JsonLineSuggestionJobRepository(f"{data_directory}/logs/{llm_identifier}/methodology_prompts_in_english_suggestion_jobs.jsonl")
   suggestion_repo = FileSystemSuggestionRepository(storage_folder= f"{data_directory}/global_class_suggestions/{llm_identifier}/v2/long")
   prompt_constructor = PromptConstructor_Methodology_PromptsInEnglish()
-  generator = SuggestionGenerator_AnyLLM(prompt_constructor, model=model, provider=provider, language="cs")
+  generator = SuggestionGenerator_AnyLLM(
+      prompt_constructor,
+      model=model,
+      provider=provider,
+      language="cs",
+      token_rate_limiter=token_rate_limiter,
+  )
 
   class_executor = ClassSuggestionExecutor(generator)
-  class_service = ClassSuggestionService(job_repo, suggestion_repo, class_executor)
+  class_service = ClassSuggestionService(job_repo, suggestion_repo, class_executor, token_rate_limiter)
   class_router = get_class_suggestion_router(class_service)
 
   property_executor = PropertySuggestionExecutor(generator)
-  property_service = PropertySuggestionService(job_repo, suggestion_repo, property_executor)
+  property_service = PropertySuggestionService(job_repo, suggestion_repo, property_executor, token_rate_limiter)
   property_router = get_property_suggestion_router(property_service)
 
   accepted_repo = SuggestionEvaluationRepository(f"{data_directory}/logs/{llm_identifier}/methodology_prompts_in_english_accepted_suggestions.jsonl")
@@ -95,6 +104,7 @@ app.include_router(property_router)
 app.include_router(accepted_router)
 app.include_router(liked_router)
 app.include_router(disliked_router)
+app.include_router(get_token_usage_router(token_rate_limiter))
 
 if static_director:
     print("INFO:     Serving frontend files.")

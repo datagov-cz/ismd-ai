@@ -15,13 +15,15 @@ class ClassSuggestionExecutor:
             k: int,
             structural_elements: List[LegalStructuralElement],
             context_text: Optional[str] = None,
-            known_conceptual_model: Optional[ConceptualModel] = None
+            known_conceptual_model: Optional[ConceptualModel] = None,
+            user_id: Optional[str] = None
         ) -> AsyncGenerator[GlobalClassSuggestion, None]:
         async for suggestion in self.generator.generate_top_k_class_suggestions(
             legal_act,
             k, 
             structural_elements,
             context_text,
-            known_conceptual_model
+            known_conceptual_model,
+            user_id
         ):
             yield suggestion

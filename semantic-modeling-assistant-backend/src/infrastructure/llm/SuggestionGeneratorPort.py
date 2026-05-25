@@ -26,7 +26,8 @@ class SuggestionGeneratorPort(ABC):
             k: int,
             structural_elements: List[LegalStructuralElement],
             context_text: Optional[str] = None,
-            known_conceptual_model: Optional[DomainConceptualModel] = None) -> AsyncGenerator[GlobalClassSuggestion, None]:
+            known_conceptual_model: Optional[DomainConceptualModel] = None,
+            user_id: Optional[str] = None) -> AsyncGenerator[GlobalClassSuggestion, None]:
         pass
 
     @abstractmethod
@@ -37,7 +38,8 @@ class SuggestionGeneratorPort(ABC):
             structural_elements: List[LegalStructuralElement],
             selected_class_id: str,
             context_text: Optional[str] = None,
-            known_conceptual_model: Optional[DomainConceptualModel] = None
+            known_conceptual_model: Optional[DomainConceptualModel] = None,
+            user_id: Optional[str] = None
     ) -> AsyncGenerator[tuple[str, GlobalAttributeSuggestion | GlobalRelationshipSuggestion], None]:
         pass
 

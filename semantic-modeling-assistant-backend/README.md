@@ -37,9 +37,27 @@ The integration:
 
 ### Processing Constraints
 - **Context Window Limits**: Large legal documents may exceed LLM context windows
-- **Rate Limits**: Subject to the configured LLM provider's limits
+- **Rate Limits**: Subject to the configured LLM provider's limits and the per-user daily token limit configured for this API
 - **Processing Time**: Response times vary based on document complexity and LLM availability
 - **Job Rejection**: Requests may be rejected due to API provider limitations
+
+### Per-User Token Limit
+
+Set `USER_DAILY_TOKEN_LIMIT` to cap each authenticated `user-id` to that many LLM tokens per calendar day. The limiter is disabled when the value is unset or `0`.
+
+```bash
+USER_DAILY_TOKEN_LIMIT=100000
+```
+
+Token usage is stored in `DATA_DIRECTORY/logs/daily_token_usage.json` by default. Override the path with `TOKEN_USAGE_FILE` if needed.
+
+Get the authenticated user's current daily token usage:
+
+```http
+GET /token-usage
+user-id: your-user-id
+password: your-password-or-api-key
+```
 
 ## Authentication
 

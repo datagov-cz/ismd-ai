@@ -17,7 +17,8 @@ class PropertySuggestionExecutor:
             structural_elements: List[LegalStructuralElement],
             selected_class: Class,
             context_text: Optional[str] = None,
-            known_conceptual_model: Optional[ConceptualModel] = None            
+            known_conceptual_model: Optional[ConceptualModel] = None,
+            user_id: Optional[str] = None
         ) -> AsyncGenerator[tuple[str, GlobalAttributeSuggestion | GlobalRelationshipSuggestion], None]:
         async for item in self.generator.generate_top_k_property_suggestions_for_class(
             legal_act,
@@ -25,5 +26,6 @@ class PropertySuggestionExecutor:
             structural_elements,
             selected_class,
             context_text,
-            known_conceptual_model):
+            known_conceptual_model,
+            user_id):
             yield item

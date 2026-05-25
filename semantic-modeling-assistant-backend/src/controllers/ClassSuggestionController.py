@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException, status, Path
+from fastapi import APIRouter, HTTPException, Request, status, Path
 from services.ClassSuggestionService import ClassSuggestionService
+from services.TokenRateLimiter import DailyTokenLimitExceeded
 from uuid import UUID
 from typing import List
 
@@ -27,17 +28,22 @@ def get_class_suggestion_router(service: ClassSuggestionService) -> APIRouter:
     )
     async def start_class_suggestions_top_k_extraction_job(
         request: StartClassSuggestionsTopKExtractionJobRequest,
+        http_request: Request,
         number: int = Path(..., description="Official number of the legal act"),
         year: int = Path(..., description="Year of the legal act"),
         date: str = Path(..., description="Date identifying the version of the legal act (YYYY-MM-DD)")
     ) -> StartClassSuggestionsJobResponse:
-        job = await service.start_class_suggestions_top_k_extraction_job(
-            number, year, date,
-            request.k,
-            request.structural_element_ids,
-            request.context_text,
-            _translate_api_conceptual_model_to_domain_conceptual_model(request.known_conceptual_model)
-        )
+        try:
+            job = await service.start_class_suggestions_top_k_extraction_job(
+                number, year, date,
+                request.k,
+                request.structural_element_ids,
+                request.context_text,
+                _translate_api_conceptual_model_to_domain_conceptual_model(request.known_conceptual_model),
+                user_id=http_request.headers.get("user-id")
+            )
+        except DailyTokenLimitExceeded as exc:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
         return StartClassSuggestionsJobResponse(
             job_id=job.job_id,
             status=job.status

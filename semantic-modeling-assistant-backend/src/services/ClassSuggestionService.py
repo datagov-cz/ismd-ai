@@ -8,6 +8,7 @@ from executors.ClassSuggestionExecutor import ClassSuggestionExecutor
 from model.domain.suggestion_model import LegalAct
 from model.api.class_suggestion import ClassSuggestion
 from model.domain.conceptual_model import ConceptualModel
+from services.TokenRateLimiter import DailyTokenRateLimiter
 from services._utils import _select_structural_elements
 import asyncio
 import traceback
@@ -17,10 +18,12 @@ class ClassSuggestionService:
             self,
             job_repo: SuggestionJobRepositoryPort,
             suggestion_repo: SuggestionRepositoryPort,
-            executor: ClassSuggestionExecutor):
+            executor: ClassSuggestionExecutor,
+            token_rate_limiter: DailyTokenRateLimiter):
         self.job_repo = job_repo
         self.suggestion_repo = suggestion_repo
         self.executor = executor
+        self.token_rate_limiter = token_rate_limiter
         self.legal_act_repo = LegalActRepositoryESEL()
 
     async def start_class_suggestions_top_k_extraction_job(
@@ -31,8 +34,11 @@ class ClassSuggestionService:
             k: int,
             structural_element_ids: List[str],
             context_text: Optional[str] = None,
-            known_conceptual_model: Optional[ConceptualModel] = None
+            known_conceptual_model: Optional[ConceptualModel] = None,
+            user_id: Optional[str] = None
         ) -> ClassSuggestionsJob:
+        if user_id:
+            self.token_rate_limiter.ensure_available(user_id)
         key = f"https://opendata.eselpoint.cz/esel-esb/eli/cz/sb/{year}/{number}/{date}"
         job_id = uuid4()
         job = ClassSuggestionsJob(
@@ -48,7 +54,7 @@ class ClassSuggestionService:
         job.start()
         self.job_repo.update(job)
         legal_act = await self._get_legal_act(number, year, date)
-        asyncio.create_task(self._execute_class_suggestions_top_k_extraction_job(job, legal_act, k, structural_element_ids, context_text, known_conceptual_model))
+        asyncio.create_task(self._execute_class_suggestions_top_k_extraction_job(job, legal_act, k, structural_element_ids, context_text, known_conceptual_model, user_id))
         return job
         
     async def _execute_class_suggestions_top_k_extraction_job(
@@ -58,11 +64,12 @@ class ClassSuggestionService:
             k: int,
             structural_element_ids: Optional[List[str]],
             context_text: Optional[str],
-            known_conceptual_model: Optional[ConceptualModel] = None):
+            known_conceptual_model: Optional[ConceptualModel] = None,
+            user_id: Optional[str] = None):
         try:
             # Get selected elements
             selected_elements = _select_structural_elements(legal_act=legal_act, structural_element_ids=structural_element_ids)
-            async for suggestion in self.executor.stream_top_k_global_class_suggestions(legal_act, k, selected_elements, context_text, known_conceptual_model):
+            async for suggestion in self.executor.stream_top_k_global_class_suggestions(legal_act, k, selected_elements, context_text, known_conceptual_model, user_id):
                 job.suggestions.append(suggestion)
             job.status = "completed"
             job.end()
@@ -70,6 +77,8 @@ class ClassSuggestionService:
             print(f"class_suggestions_top_k_extraction_job {job.job_id} completed successfully.")
         except Exception as e:
             job.status = "failed"
+            job.end()
+            self.job_repo.save(job)
             print(f"Error class_suggestions_top_k_extraction_job {job.job_id}: {e}")
             print("Traceback details:")
             traceback.print_exc()

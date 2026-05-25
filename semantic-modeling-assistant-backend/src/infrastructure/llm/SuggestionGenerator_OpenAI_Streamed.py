@@ -47,7 +47,8 @@ class SuggestionGenerator_OpenAI_Streamed(SuggestionGeneratorPort):
             k: int,
             structural_elements: List[LegalStructuralElement],
             context_text: Optional[str] = None,
-            known_conceptual_model: Optional[DomainConceptualModel] = None) -> AsyncGenerator[GlobalClassSuggestion, None]:
+            known_conceptual_model: Optional[DomainConceptualModel] = None,
+            user_id: Optional[str] = None) -> AsyncGenerator[GlobalClassSuggestion, None]:
         
         client = AsyncOpenAI(api_key=self.openai_api_key)
 
@@ -216,7 +217,8 @@ class SuggestionGenerator_OpenAI_Streamed(SuggestionGeneratorPort):
             structural_elements: List[LegalStructuralElement],
             selected_class: DomainClass,
             context_text: Optional[str] = None,
-            known_conceptual_model: Optional[DomainConceptualModel] = None
+            known_conceptual_model: Optional[DomainConceptualModel] = None,
+            user_id: Optional[str] = None
         ) -> AsyncGenerator[tuple[str, GlobalAttributeSuggestion | GlobalRelationshipSuggestion], None]:
         # Gather legal text
         legal_text = ''

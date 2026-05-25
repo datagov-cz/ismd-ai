@@ -7,6 +7,7 @@ from infrastructure.repositories.jobs.SuggestionJob import PropertySuggestionJob
 from executors.PropertySuggestionExecutor import PropertySuggestionExecutor
 from model.domain.suggestion_model import LegalAct
 from model.domain.conceptual_model import ConceptualModel, Class
+from services.TokenRateLimiter import DailyTokenRateLimiter
 from services._utils import _select_structural_elements
 
 import asyncio
@@ -17,10 +18,12 @@ class PropertySuggestionService:
             self,
             job_repo: SuggestionJobRepositoryPort,
             suggestion_repo: SuggestionRepositoryPort,
-            executor: PropertySuggestionExecutor):
+            executor: PropertySuggestionExecutor,
+            token_rate_limiter: DailyTokenRateLimiter):
         self.job_repo = job_repo
         self.suggestion_repo = suggestion_repo
         self.executor = executor
+        self.token_rate_limiter = token_rate_limiter
         self.legal_act_repo = LegalActRepositoryESEL()
 
     async def _get_legal_act(
@@ -47,8 +50,11 @@ class PropertySuggestionService:
             structural_element_ids: List[str],
             selected_class_id: str,
             context_text: Optional[str] = None,
-            known_conceptual_model: Optional[ConceptualModel] = None
+            known_conceptual_model: Optional[ConceptualModel] = None,
+            user_id: Optional[str] = None
         ) -> PropertySuggestionJob:
+        if user_id:
+            self.token_rate_limiter.ensure_available(user_id)
         key = f"https://opendata.eselpoint.cz/esel-esb/eli/cz/sb/{year}/{number}/{date}"
         job_id = uuid4()
         job = PropertySuggestionJob(
@@ -82,7 +88,8 @@ class PropertySuggestionService:
                 structural_element_ids,
                 selected_class,
                 context_text,
-                known_conceptual_model
+                known_conceptual_model,
+                user_id
             )
         )
         return job
@@ -95,7 +102,8 @@ class PropertySuggestionService:
             structural_element_ids: Optional[List[str]],
             selected_class: Class,
             context_text: Optional[str],
-            known_conceptual_model: Optional[ConceptualModel] = None):
+            known_conceptual_model: Optional[ConceptualModel] = None,
+            user_id: Optional[str] = None):
         try:
             selected_elements = _select_structural_elements(legal_act=legal_act, structural_element_ids=structural_element_ids)
             async for kind, suggestion in self.executor.stream_top_k_global_property_suggestions(
@@ -104,7 +112,8 @@ class PropertySuggestionService:
                 selected_elements,
                 selected_class,
                 context_text,
-                known_conceptual_model
+                known_conceptual_model,
+                user_id
             ):
                 if kind == "attribute":
                     job.attribute_suggestions.append(suggestion)
@@ -115,5 +124,7 @@ class PropertySuggestionService:
             self.job_repo.save(job)
         except Exception as e:
             job.status = "failed"
+            job.end()
+            self.job_repo.save(job)
             print(f"Error property_suggestions_top_k_extraction_job {job.job_id}: {e}")
             traceback.print_exc()
