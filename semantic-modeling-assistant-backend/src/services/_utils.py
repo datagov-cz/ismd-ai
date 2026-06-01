@@ -9,7 +9,7 @@ def _select_structural_elements(
       # Preprocess input IDs for fast lookup
       id_set = set(structural_element_ids)
       # Extract the number from el.id and match with input IDs
-      def extract_number(el_id: str) -> str:
+      def extract_number(el_id: str) -> Optional[str]:
           # Assumes the number is after 'par_' and before any trailing chars
           import re
           match = re.search(r'par_(\d+[a-z]*)', el_id)

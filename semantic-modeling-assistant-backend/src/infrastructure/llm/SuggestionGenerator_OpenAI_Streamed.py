@@ -1,7 +1,7 @@
 import os
 import json
 import re
-from typing import AsyncGenerator, List, Optional
+from typing import Any, AsyncGenerator, List, Optional, cast
 from uuid import uuid4
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
@@ -15,7 +15,7 @@ from model.domain.suggestion_model import GlobalClassSuggestion, LocalClassSugge
 
 #internals
 from infrastructure.llm.SuggestionGeneratorPort import SuggestionGeneratorPort
-from infrastructure.llm.prompt_constructors import PromptConstructorPort
+from infrastructure.llm.prompt_constructors.PromptConstructorPort import PromptConstructorPort
 from model.llm.generated_suggestions_model import (
   LocalSemanticModel,
   ClassExtractionResult,
@@ -61,21 +61,22 @@ class SuggestionGenerator_OpenAI_Streamed(SuggestionGeneratorPort):
         else:
             raise Exception("No structural elements provided and cannot generate legal_text.")
 
+        known_conceptual_model_text = None
         if known_conceptual_model is not None:
             known_conceptual_model_text = self._translate_domain_conceptual_model_classes_to_llm_conceptual_model_classes(known_conceptual_model)
 
-        input = self.prompt_constructor.construct_top_k_global_class_suggestion_prompt(legal_text, k, context_text if context_text else None, known_conceptual_model_text if known_conceptual_model else None)
+        input = self.prompt_constructor.construct_top_k_global_class_suggestion_prompt(legal_text, k, context_text if context_text else None, known_conceptual_model_text)
 
         buffer = ''
         yielded_class_names = set()
-        global_class_suggestions = []
-        parents = []
+        global_class_suggestions: list[GlobalClassSuggestion] = []
+        parents: list[GlobalClassSuggestion] = []
         import json as _json
         from model.llm.generated_suggestions_model import ClassExtractionResult
 
         async with client.responses.stream(
             model=self.model,
-            input=input,
+            input=cast(Any, input),
             text_format=ClassExtractionResult,
         ) as stream:
             async for event in stream:
@@ -135,45 +136,45 @@ class SuggestionGenerator_OpenAI_Streamed(SuggestionGeneratorPort):
 
                                     if extracted_class.get("parent") is not None and isinstance(extracted_class.get("parent"), str) and extracted_class.get("parent").strip() != "":
                                         parent_name = extracted_class["parent"]
-                                        parent_suggestion = None
+                                        specializes_parent: Optional[GlobalClassSuggestion] = None
 
                                         # Check if suggested parent already in global_class_suggestions
                                         for existing in global_class_suggestions:
                                             if existing.name.value == parent_name:
-                                                parent_suggestion = existing
+                                                specializes_parent = existing
                                                 break
 
                                         # Check if suggested parent already in parents
-                                        if parent_suggestion is None:
+                                        if specializes_parent is None:
                                             for existing in parents:
                                                 if existing.name.value == parent_name:
-                                                    parent_suggestion = existing
+                                                    specializes_parent = existing
                                                     break
 
                                         # Check if suggested parent in known_conceptual_model
-                                        if parent_suggestion is None and known_conceptual_model is not None:
+                                        if specializes_parent is None and known_conceptual_model is not None:
                                             for domain_class in known_conceptual_model.classes:
                                                 if getattr(domain_class.name, 'value', None) == parent_name:
-                                                    parent_suggestion = GlobalClassSuggestion(
+                                                    specializes_parent = GlobalClassSuggestion(
                                                         id=domain_class.id,
                                                         name=LangString(**{"@value": parent_name, "@language": self.language}),
                                                         isBasedOnLegalAct=legal_act,
                                                         createdFromLocalUniversalSuggestion=[]
                                                     )
-                                                    parents.append(parent_suggestion)
+                                                    parents.append(specializes_parent)
                                                     break
 
                                         # Otherwise, create new
-                                        if parent_suggestion is None:
-                                            parent_suggestion = GlobalClassSuggestion(
+                                        if specializes_parent is None:
+                                            specializes_parent = GlobalClassSuggestion(
                                                 id=str(uuid4()),
                                                 name=LangString(**{"@value": parent_name, "@language": self.language}),
                                                 isBasedOnLegalAct=legal_act,
                                                 createdFromLocalUniversalSuggestion=[]
                                             )
-                                            parents.append(parent_suggestion)
+                                            parents.append(specializes_parent)
 
-                                        global_class_suggestion.specializes = [parent_suggestion]
+                                        global_class_suggestion.specializes = [specializes_parent]
 
                                     # Map "references" to createdFromLocalUniversalSuggestion as LocalClassSuggestion
                                     references = extracted_class.get("references", [])
@@ -200,9 +201,11 @@ class SuggestionGenerator_OpenAI_Streamed(SuggestionGeneratorPort):
                     print(event.error, end="")
                 elif event.type == "response.completed":
                     for parent in parents:
-                        if parent not in global_class_suggestions and not any(
-                            getattr(domain_class.name, 'value', None) == parent.name.value for domain_class in known_conceptual_model.classes
-                        ):
+                        known_parent = known_conceptual_model is not None and any(
+                            getattr(domain_class.name, 'value', None) == parent.name.value
+                            for domain_class in known_conceptual_model.classes
+                        )
+                        if parent not in global_class_suggestions and not known_parent:
                             global_class_suggestions.append(parent)
                             yield parent
                             print(f"generate_top_k_class_suggestions: Identified parent class suggestion {parent.name.value} in the legal act {legal_act.officialNumber} which was not extracted as a primary class suggestion.")
@@ -246,14 +249,14 @@ class SuggestionGenerator_OpenAI_Streamed(SuggestionGeneratorPort):
         pattern = re.compile(r'}\s*,\s*\{|}\s*]')
 
         # Track already created class suggestions by name
-        created_class_suggestions = {}
+        created_class_suggestions: dict[str, GlobalClassSuggestion] = {}
 
         async with client.responses.stream(
             model=self.model,
-            input=input,
+            input=cast(Any, input),
             text_format=PropertyExtractionResult,
-            reasoning={},
-            tools=[],
+            reasoning=cast(Any, {}),
+            tools=cast(Any, []),
             temperature=0,
             max_output_tokens=2048,
             top_p=1,
@@ -375,7 +378,7 @@ class SuggestionGenerator_OpenAI_Streamed(SuggestionGeneratorPort):
                                             officialIdentifier=reference
                                         )
                                         global_relationship_suggestion.isBasedOnLegalStructuralElement.append(legal_structural_element)
-                                    global_relationship_suggestion.mediatesClass = mediates_classes
+                                    global_relationship_suggestion.mediatesClass = cast(Any, mediates_classes)
                                     yield ("relationship", global_relationship_suggestion)
                                     print(f"generate_top_k_property_suggestions_for_class (streamed): Identified relationship suggestion {global_relationship_suggestion.name.value} for the class {selected_class.name.value} in the legal act {legal_act.officialNumber}")
                                     # Print also isBasedOnLegalStructuralElement list
@@ -474,7 +477,7 @@ class SuggestionGenerator_OpenAI_Streamed(SuggestionGeneratorPort):
                                         )
                                         created_class_suggestions[target_name] = target_class
                                     mediates_classes.append(target_class)
-                                    global_relationship_suggestion.mediatesClass = mediates_classes
+                                    global_relationship_suggestion.mediatesClass = cast(Any, mediates_classes)
                                     yield ("relationship", global_relationship_suggestion)
                                     print(f"generate_top_k_property_suggestions_for_class (streamed): Identified relationship suggestion {global_relationship_suggestion.name.value} for the class {selected_class.name.value} in the legal act {legal_act.officialNumber}")
                     except _json.JSONDecodeError:

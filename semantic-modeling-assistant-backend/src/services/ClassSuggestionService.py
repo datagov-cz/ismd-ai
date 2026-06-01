@@ -32,7 +32,7 @@ class ClassSuggestionService:
             year: int,
             date: str,
             k: int,
-            structural_element_ids: List[str],
+            structural_element_ids: Optional[List[str]],
             context_text: Optional[str] = None,
             known_conceptual_model: Optional[ConceptualModel] = None,
             user_id: Optional[str] = None

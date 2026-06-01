@@ -5,7 +5,7 @@ from infrastructure.repositories.suggestions.SuggestionRepositoryPort import Sug
 from infrastructure.repositories.legal_acts.LegalActRepositoryESEL import LegalActRepositoryESEL
 from infrastructure.repositories.jobs.SuggestionJob import PropertySuggestionJob
 from executors.PropertySuggestionExecutor import PropertySuggestionExecutor
-from model.domain.suggestion_model import LegalAct
+from model.domain.suggestion_model import GlobalAttributeSuggestion, GlobalRelationshipSuggestion, LegalAct
 from model.domain.conceptual_model import ConceptualModel, Class
 from services.TokenRateLimiter import DailyTokenRateLimiter
 from services._utils import _select_structural_elements
@@ -47,7 +47,7 @@ class PropertySuggestionService:
             year: int,
             date: str,
             k: int,
-            structural_element_ids: List[str],
+            structural_element_ids: Optional[List[str]],
             selected_class_id: str,
             context_text: Optional[str] = None,
             known_conceptual_model: Optional[ConceptualModel] = None,
@@ -116,9 +116,9 @@ class PropertySuggestionService:
                 user_id
             ):
                 if kind == "attribute":
-                    job.attribute_suggestions.append(suggestion)
+                    job.attribute_suggestions.append(cast(GlobalAttributeSuggestion, suggestion))
                 elif kind == "relationship":
-                    job.relationship_suggestions.append(suggestion)
+                    job.relationship_suggestions.append(cast(GlobalRelationshipSuggestion, suggestion))
             job.status = "completed"
             job.end()
             self.job_repo.save(job)

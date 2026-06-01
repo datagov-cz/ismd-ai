@@ -15,8 +15,8 @@ class LocalUniversalSuggestion(UniversalSuggestion):
 
 class GlobalUniversalSuggestion(UniversalSuggestion):
     isBasedOnLegalAct: LegalAct
-    createdFromLocalUniversalSuggestion: List[LocalUniversalSuggestion]
-    isBasedOnLegalStructuralElement: Optional[LegalStructuralElement] = []
+    createdFromLocalUniversalSuggestion: List[LocalUniversalSuggestion] = Field(default_factory=list)
+    isBasedOnLegalStructuralElement: List[LegalStructuralElement] = Field(default_factory=list)
 
 class AttributeSuggestion(UniversalSuggestion):
     isAttribute: bool = True

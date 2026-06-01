@@ -1,6 +1,6 @@
 import os
 import json
-from typing import AsyncGenerator, List, Optional
+from typing import Any, AsyncGenerator, List, Optional, cast
 from uuid import uuid4
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
@@ -14,7 +14,7 @@ from model.domain.suggestion_model import GlobalClassSuggestion, LocalClassSugge
 
 #internals
 from infrastructure.llm.SuggestionGeneratorPort import SuggestionGeneratorPort
-from infrastructure.llm.prompt_constructors import PromptConstructorPort
+from infrastructure.llm.prompt_constructors.PromptConstructorPort import PromptConstructorPort
 from model.llm.generated_suggestions_model import (
   LocalSemanticModel,
   ClassExtractionResult,
@@ -59,25 +59,28 @@ class SuggestionGenerator_OpenAI(SuggestionGeneratorPort):
 
         legal_text = ''
         if len(structural_elements) == 0:
-            legal_text = ''.join([element.textContent for element in legal_act.consistsOf])
+            legal_text = ''.join([element.textContent for element in legal_act.consistsOf or []])
         else:
             for structural_element in structural_elements:
                 legal_text += structural_element.textContent
 
+        known_conceptual_model_text = None
         if known_conceptual_model is not None:
             known_conceptual_model_text = self._translate_domain_conceptual_model_to_llm_conceptual_model(known_conceptual_model)
 
-        messages = self.prompt_constructor.construct_top_k_global_class_suggestion_prompt(legal_text, k, context_text if context_text else None, known_conceptual_model_text if known_conceptual_model else None)
+        messages = self.prompt_constructor.construct_top_k_global_class_suggestion_prompt(legal_text, k, context_text if context_text else None, known_conceptual_model_text)
 
         response = await client.beta.chat.completions.parse(
             model=self.model,
-            messages=messages,
+            messages=cast(Any, messages),
             response_format=ClassExtractionResult
         )
 
         class_extraction_result = response.choices[0].message.parsed
-        global_class_suggestions = []
-        parents = []
+        if class_extraction_result is None:
+            return
+        global_class_suggestions: list[GlobalClassSuggestion] = []
+        parents: list[GlobalClassSuggestion] = []
         for extracted_class in class_extraction_result.extracted_classes:
 
             global_class_suggestion = next((suggestion for suggestion in parents if suggestion.name.value == extracted_class.name), None)
@@ -160,9 +163,11 @@ class SuggestionGenerator_OpenAI(SuggestionGeneratorPort):
 
         #check if there is any class suggestion in parents that is not in global_class_suggestions. For each of them, yield it as well
         for parent in parents:
-            if parent not in global_class_suggestions and not any(
-                getattr(domain_class.name, 'value', None) == parent.name.value for domain_class in known_conceptual_model.classes
-            ):
+            known_parent = known_conceptual_model is not None and any(
+                getattr(domain_class.name, 'value', None) == parent.name.value
+                for domain_class in known_conceptual_model.classes
+            )
+            if parent not in global_class_suggestions and not known_parent:
                 global_class_suggestions.append(parent)
                 print(f"generate_top_k_class_suggestions: Identified parent class suggestion {parent.name.value} in the legal act {legal_act.officialNumber} which was not extracted as a primary class suggestion.")
 
@@ -181,7 +186,7 @@ class SuggestionGenerator_OpenAI(SuggestionGeneratorPort):
         # Gather legal text
         legal_text = ''
         if len(structural_elements) == 0:
-            legal_text = ''.join([element.textContent for element in legal_act.consistsOf])
+            legal_text = ''.join([element.textContent for element in legal_act.consistsOf or []])
         else:
             for structural_element in structural_elements:
                 legal_text += structural_element.textContent
@@ -198,10 +203,12 @@ class SuggestionGenerator_OpenAI(SuggestionGeneratorPort):
         client = AsyncOpenAI(api_key=self.openai_api_key)
         response = await client.beta.chat.completions.parse(
             model=self.model,
-            messages=messages,
+            messages=cast(Any, messages),
             response_format=PropertyExtractionResult  # Assume JSON output
         )
         property_extraction_result = response.choices[0].message.parsed
+        if property_extraction_result is None:
+            return
         for extracted_property in property_extraction_result.extracted_properties:
             kind = extracted_property.kind
             if kind == 'attribute':
@@ -246,7 +253,11 @@ class SuggestionGenerator_OpenAI(SuggestionGeneratorPort):
 
                 # Process source class
                 source_domain_class = next(
-                    (domain_class for domain_class in known_conceptual_model.classes if domain_class.name.value == extracted_property.source),
+                    (
+                        domain_class
+                        for domain_class in (known_conceptual_model.classes if known_conceptual_model else [])
+                        if domain_class.name.value == extracted_property.source
+                    ),
                     None
                 )
                 source_class = None
@@ -267,7 +278,11 @@ class SuggestionGenerator_OpenAI(SuggestionGeneratorPort):
                 mediates_classes.append(source_class)
 
                 target_domain_class = next(
-                    (domain_class for domain_class in known_conceptual_model.classes if domain_class.name.value == extracted_property.target),
+                    (
+                        domain_class
+                        for domain_class in (known_conceptual_model.classes if known_conceptual_model else [])
+                        if domain_class.name.value == extracted_property.target
+                    ),
                     None
                 )
                 target_class = None
@@ -287,7 +302,7 @@ class SuggestionGenerator_OpenAI(SuggestionGeneratorPort):
                     )
                 mediates_classes.append(target_class)
 
-                global_relationship_suggestion.mediatesClass = mediates_classes
+                global_relationship_suggestion.mediatesClass = cast(Any, mediates_classes)
                 yield ("relationship", global_relationship_suggestion)
 
                 print(f"generate_top_k_property_suggestions_for_class: Identified relationship suggestion {global_relationship_suggestion.name.value} for the class {selected_class.name.value} in the legal act {legal_act.officialNumber}")

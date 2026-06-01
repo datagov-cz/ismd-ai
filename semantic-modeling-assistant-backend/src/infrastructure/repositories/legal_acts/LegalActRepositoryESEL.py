@@ -4,6 +4,7 @@ import re
 import os
 import json
 from datetime import datetime
+from typing import Any, cast
 
 class LegalActRepositoryESEL:
   def __init__(self):
@@ -105,12 +106,13 @@ class LegalActRepositoryESEL:
       results = g.query(sparql_str)
       name = ""
       for row in results:
+        row = cast(Any, row)
         name = str(row.nazev)
       return name
     except Exception as e:
       raise RuntimeError(f"Failed to load legal act name: {e}")
 
-  def _load_legal_act_content_from_esel(self, legal_act_id: str) -> LegalAct:
+  def _load_legal_act_content_from_esel(self, legal_act_id: str) -> list[LegalStructuralElement]:
     """
     Loads the content of a legal act from the SPARQL endpoint using the provided query.
 
@@ -137,9 +139,10 @@ class LegalActRepositoryESEL:
     try:
       results = g.query(sparql_str)
 
-      act_paragraphs = {}
+      act_paragraphs: dict[str, str] = {}
 
       for row in results:
+        row = cast(Any, row)
         citace = str(row.citace)
         match = re.match(r"§ (\d+[a-z]*)( .*|$)", citace)
         if match:

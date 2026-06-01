@@ -2,14 +2,14 @@ import os
 import json
 import re
 import math
-from typing import AsyncGenerator, List, Optional
+from typing import Any, AsyncGenerator, List, Optional
 from uuid import uuid4
 
 from any_llm import acompletion
 from dotenv import load_dotenv
 
 from infrastructure.llm.SuggestionGeneratorPort import SuggestionGeneratorPort
-from infrastructure.llm.prompt_constructors import PromptConstructorPort
+from infrastructure.llm.prompt_constructors.PromptConstructorPort import PromptConstructorPort
 from services.TokenRateLimiter import DailyTokenRateLimiter
 from model.domain.conceptual_model import (
     Class as DomainClass,
@@ -75,8 +75,8 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
         response = await self._completion(messages, ClassExtractionResult, user_id=user_id)
         class_extraction_result = response.choices[0].message.parsed
 
-        global_class_suggestions = []
-        parents = []
+        global_class_suggestions: list[GlobalClassSuggestion] = []
+        parents: list[GlobalClassSuggestion] = []
         for extracted_class in class_extraction_result.extracted_classes:
             global_class_suggestion = next(
                 (
@@ -184,22 +184,22 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
             max_tokens=int(os.getenv("LLM_MAX_TOKENS", "2048")),
         )
         property_extraction_result = response.choices[0].message.parsed
-        created_class_suggestions = {}
+        created_class_suggestions: dict[str, GlobalClassSuggestion] = {}
 
         for extracted_property in property_extraction_result.extracted_properties:
             if extracted_property.kind == "attribute":
-                suggestion = self._to_global_attribute_suggestion(
+                attribute_suggestion = self._to_global_attribute_suggestion(
                     extracted_property,
                     legal_act,
                 )
                 print(
                     f"generate_top_k_property_suggestions_for_class: Identified attribute suggestion "
-                    f"{suggestion.name.value} for the class {selected_class.name.value} in the legal act "
+                    f"{attribute_suggestion.name.value} for the class {selected_class.name.value} in the legal act "
                     f"{legal_act.officialNumber}"
                 )
-                yield ("attribute", suggestion)
+                yield ("attribute", attribute_suggestion)
             elif extracted_property.kind == "relationship":
-                suggestion = self._to_global_relationship_suggestion(
+                relationship_suggestion = self._to_global_relationship_suggestion(
                     extracted_property,
                     legal_act,
                     known_conceptual_model,
@@ -207,17 +207,17 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
                 )
                 print(
                     f"generate_top_k_property_suggestions_for_class: Identified relationship suggestion "
-                    f"{suggestion.name.value} for the class {selected_class.name.value} in the legal act "
+                    f"{relationship_suggestion.name.value} for the class {selected_class.name.value} in the legal act "
                     f"{legal_act.officialNumber}"
                 )
-                yield ("relationship", suggestion)
+                yield ("relationship", relationship_suggestion)
 
         print(
             f"generate_top_k_property_suggestions_for_class: Identification of top K properties for the class "
             f"{selected_class.name.value} in the legal act {legal_act.officialNumber} completed."
         )
 
-    async def _completion(self, messages, response_format, user_id: Optional[str] = None, **kwargs):
+    async def _completion(self, messages, response_format, user_id: Optional[str] = None, **kwargs) -> Any:
         params = {
             "model": self.model,
             "provider": self.provider,

@@ -6,7 +6,7 @@ from model.domain.conceptual_model import (
   ConceptualModel as DomainConceptualModel,
   Class as DomainClass
 )
-from infrastructure.llm.prompt_constructors import PromptConstructorPort
+from infrastructure.llm.prompt_constructors.PromptConstructorPort import PromptConstructorPort
 
 from model.llm.conceptual_model import (
     ConceptualModel as LLMConceptualModel,
@@ -20,7 +20,7 @@ class SuggestionGeneratorPort(ABC):
         pass
 
     @abstractmethod
-    async def generate_top_k_class_suggestions(
+    def generate_top_k_class_suggestions(
             self,
             legal_act: LegalAct,
             k: int,
@@ -31,12 +31,12 @@ class SuggestionGeneratorPort(ABC):
         pass
 
     @abstractmethod
-    async def generate_top_k_property_suggestions_for_class(
+    def generate_top_k_property_suggestions_for_class(
             self,
             legal_act: LegalAct,
             k: int,
             structural_elements: List[LegalStructuralElement],
-            selected_class_id: str,
+            selected_class: DomainClass,
             context_text: Optional[str] = None,
             known_conceptual_model: Optional[DomainConceptualModel] = None,
             user_id: Optional[str] = None
@@ -50,20 +50,20 @@ class SuggestionGeneratorPort(ABC):
         The output is as short as possible: no null/None/empty values are serialized.
         """
 
-        classes = []
+        classes: list[dict[str, object]] = []
         for domain_class in domain_conceptual_model.classes:
-            class_obj = {"name": domain_class.name.value}
+            class_obj: dict[str, object] = {"name": domain_class.name.value}
             if selected_class and domain_class is selected_class:
-                if getattr(domain_class, 'definition', None) and getattr(domain_class.definition, 'value', None):
-                    if domain_class.definition.value:
-                        class_obj["definition"] = domain_class.definition.value
-                if getattr(domain_class, 'explanation', None) and getattr(domain_class.explanation, 'value', None):
-                    if domain_class.explanation.value:
-                        class_obj["explanation"] = domain_class.explanation.value
-                if getattr(domain_class, 'ownsAttribute', None):
+                definition = domain_class.definition
+                if definition is not None and definition.value:
+                    class_obj["definition"] = definition.value
+                explanation = domain_class.explanation
+                if explanation is not None and explanation.value:
+                    class_obj["explanation"] = explanation.value
+                if domain_class.ownsAttribute:
                     attrs = [
                         {"name": attr.name.value}
-                        for attr in domain_class.ownsAttribute
+                        for attr in domain_class.ownsAttribute or []
                         if getattr(attr, 'name', None) and getattr(attr.name, 'value', None)
                     ]
                     if attrs:
@@ -85,7 +85,7 @@ class SuggestionGeneratorPort(ABC):
                 )
             ]
 
-        result = {"classes": classes}
+        result: dict[str, object] = {"classes": classes}
         if relationships:
             result["relationships"] = relationships
 

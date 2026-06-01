@@ -11,4 +11,4 @@ class LegalAct(BaseModel):
     id: str
     officialTitle: str
     officialNumber: str
-    consistsOf: Optional[List[LegalStructuralElement]] = None
+    consistsOf: List[LegalStructuralElement] = Field(default_factory=list)

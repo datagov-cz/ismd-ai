@@ -19,6 +19,8 @@ from model.domain.suggestion_model import (
   GlobalAttributeSuggestion,
   GlobalRelationshipSuggestion
 )
+from typing import Any, Optional, cast
+
 from model.api.conceptual_model import (
     ConceptualModel as ApiConceptualModel,
     Class as ApiClass,
@@ -34,25 +36,27 @@ from model.domain.conceptual_model import (
 from model.api.lang_model import LangString as ApiLangString
 from model.domain.lang_model import LangString as DomainLangString
 
-def _translate_api_langstring_to_domain_langstring(api_langstring: ApiLangString) -> DomainLangString:
+def _translate_api_langstring_to_domain_langstring(api_langstring: Optional[ApiLangString]) -> Optional[DomainLangString]:
     if api_langstring is None:
         return None
     # Handle dict input (from parsed JSON)
     if isinstance(api_langstring, dict):
         value = api_langstring.get("@value") or api_langstring.get("value")
         language = api_langstring.get("@language") or api_langstring.get("language")
+        if not isinstance(value, str) or not isinstance(language, str):
+            raise ValueError("Invalid language string payload.")
         return DomainLangString(**{"@value": value, "@language": language})
     # Handle pydantic model input
     return DomainLangString(**{"@value": api_langstring.value, "@language": api_langstring.language})
 
-def _translate_api_conceptual_model_to_domain_conceptual_model(api_conceptual_model: ApiConceptualModel) -> DomainConceptualModel:
+def _translate_api_conceptual_model_to_domain_conceptual_model(api_conceptual_model: Optional[ApiConceptualModel]) -> DomainConceptualModel:
     # Create a mapping of class IDs to DomainClass instances for reuse
     if not api_conceptual_model:
         return DomainConceptualModel(classes=[], relationships=[])
     class_id_to_domain_class = {
         cls.id: DomainClass(
             id=cls.id,
-            name=_translate_api_langstring_to_domain_langstring(cls.name),
+            name=cast(DomainLangString, _translate_api_langstring_to_domain_langstring(cls.name)),
             definition=_translate_api_langstring_to_domain_langstring(cls.definition) if cls.definition else None,
             explanation=_translate_api_langstring_to_domain_langstring(cls.explanation) if cls.explanation else None,
             isSubjectOfLaw=cls.isSubjectOfLaw,
@@ -62,7 +66,7 @@ def _translate_api_conceptual_model_to_domain_conceptual_model(api_conceptual_mo
             ownsAttribute=[
                 DomainAttribute(
                     id=attr.id,
-                    name=_translate_api_langstring_to_domain_langstring(attr.name),
+                    name=cast(DomainLangString, _translate_api_langstring_to_domain_langstring(attr.name)),
                     definition=_translate_api_langstring_to_domain_langstring(attr.definition) if attr.definition else None,
                     explanation=_translate_api_langstring_to_domain_langstring(attr.explanation) if attr.explanation else None,
                 ) for attr in cls.ownsAttribute or []
@@ -75,10 +79,10 @@ def _translate_api_conceptual_model_to_domain_conceptual_model(api_conceptual_mo
         relationships=[
             DomainRelationship(
                 id=rel.id,
-                name=_translate_api_langstring_to_domain_langstring(rel.name),
+                name=cast(DomainLangString, _translate_api_langstring_to_domain_langstring(rel.name)),
                 definition=_translate_api_langstring_to_domain_langstring(rel.definition) if rel.definition else None,
                 mediatesClass=[
-                    class_id_to_domain_class.get(mediated_cls.id)
+                    class_id_to_domain_class[mediated_cls.id]
                     for mediated_cls in rel.mediatesClass or []
                     if mediated_cls.id in class_id_to_domain_class
                 ] if rel.mediatesClass else None
@@ -102,7 +106,7 @@ def _translate_domain_to_api_class_suggestion(domain_suggestion: GlobalClassSugg
     return ClassSuggestion(
         id=domain_suggestion.id,
         type="Class Suggestion",
-        name=to_dict_or_none(domain_suggestion.name),
+        name=cast(ApiLangString, to_dict_or_none(domain_suggestion.name)),
         definition=to_dict_or_none(getattr(domain_suggestion, "definition", None)),
         explanation=to_dict_or_none(getattr(domain_suggestion, "explanation", None)),
         is_subject_of_law=domain_suggestion.isSubjectOfLaw,
@@ -133,7 +137,7 @@ def _translate_domain_to_api_attribute_suggestion(domain_suggestion: GlobalAttri
   return AttributeSuggestion(
         id=domain_suggestion.id,
         type="Attribute Suggestion",
-        name=to_dict_or_none(domain_suggestion.name),
+        name=cast(ApiLangString, to_dict_or_none(domain_suggestion.name)),
         definition=to_dict_or_none(getattr(domain_suggestion, "definition", None)),
         explanation=to_dict_or_none(getattr(domain_suggestion, "explanation", None)),
         legal_act=LegalAct(
@@ -161,7 +165,7 @@ def _translate_domain_to_api_relationship_suggestion(domain_suggestion: GlobalRe
                     ApiClassSuggestion(
                         id=domain_class.id,
                         type="Class Suggestion", # Assuming a fixed type string for the API model
-                        name=to_dict_or_none(domain_class.name) # Reuse the conversion helper
+                        name=cast(ApiLangString, to_dict_or_none(domain_class.name)) # Reuse the conversion helper
                     )
                 )
             # Optional: Add logging here if a mediated class is skipped due to type/attribute issues
@@ -169,7 +173,7 @@ def _translate_domain_to_api_relationship_suggestion(domain_suggestion: GlobalRe
     return RelationshipSuggestion(
         id=domain_suggestion.id,
         type="Relationship Suggestion",
-        name=to_dict_or_none(domain_suggestion.name),
+        name=cast(ApiLangString, to_dict_or_none(domain_suggestion.name)),
         definition=to_dict_or_none(getattr(domain_suggestion, "definition", None)),
         explanation=to_dict_or_none(getattr(domain_suggestion, "explanation", None)),
         legal_act=LegalAct(
@@ -187,27 +191,26 @@ def _translate_domain_to_api_relationship_suggestion(domain_suggestion: GlobalRe
         ] if domain_suggestion.isBasedOnLegalStructuralElement else None
     )
 
-def to_dict_or_none(lang_string):
+def to_dict_or_none(lang_string: Any) -> Optional[ApiLangString]:
         if lang_string is None:
             return None
-        # If already a dict with correct keys, return as is
+        value = None
+        language = None
         if isinstance(lang_string, dict):
             if "@value" in lang_string and "@language" in lang_string:
-                return lang_string
-            # Convert if keys are 'value' and 'language'
-            if "value" in lang_string and "language" in lang_string:
-                return {"@value": lang_string["value"], "@language": lang_string["language"]}
-            return lang_string
-        # For Pydantic models or custom classes
-        if hasattr(lang_string, "model_dump"):
+                value = lang_string["@value"]
+                language = lang_string["@language"]
+            else:
+                value = lang_string.get("value")
+                language = lang_string.get("language")
+        elif hasattr(lang_string, "model_dump"):
             d = lang_string.model_dump()
-            # Convert keys if needed
-            if "value" in d and "language" in d:
-                return {"@value": d["value"], "@language": d["language"]}
-            return d
-        if hasattr(lang_string, "__dict__"):
+            value = d.get("@value") or d.get("value")
+            language = d.get("@language") or d.get("language")
+        elif hasattr(lang_string, "__dict__"):
             d = lang_string.__dict__
-            if "value" in d and "language" in d:
-                return {"@value": d["value"], "@language": d["language"]}
-            return d
-        return lang_string
+            value = d.get("@value") or d.get("value")
+            language = d.get("@language") or d.get("language")
+        if isinstance(value, str) and isinstance(language, str):
+            return ApiLangString(**{"@value": value, "@language": language})
+        return None

@@ -1,7 +1,7 @@
 from infrastructure.repositories.jobs.SuggestionJobRepositoryPort import SuggestionJobRepositoryPort
 from infrastructure.repositories.jobs.SuggestionJob import SuggestionJob
 from uuid import UUID
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 import json
 from filelock import FileLock
 import threading
@@ -24,7 +24,7 @@ class JsonLineSuggestionJobRepository(SuggestionJobRepositoryPort):
         """
         Prepare the job object for logging. Only include basic SuggestionJob fields.
         """
-        data = {
+        data: dict[str, Any] = {
             "job_id": str(job.job_id),
             "legal_act_key": job.legal_act_key,
             "k": job.k,
@@ -93,12 +93,12 @@ class JsonLineSuggestionJobRepository(SuggestionJobRepositoryPort):
                       ]
                   data["suggestions"].append(suggestion_data)
         elif data["type"] == "PropertySuggestionJob":
-          data["selected_class_id"] = str(job.selected_class_id) if hasattr(job, "selected_class_id") else None
+          property_job = job if isinstance(job, PropertySuggestionJob) else PropertySuggestionJob(**job.__dict__)
+          data["selected_class_id"] = str(property_job.selected_class_id)
           data["suggestions"] = []
           logged_new_suggested_classes = set()
-          if hasattr(job, "attribute_suggestions") and job.attribute_suggestions:
-              job = job if isinstance(job, PropertySuggestionJob) else PropertySuggestionJob(**job.__dict__)
-              for s in job.attribute_suggestions:
+          if property_job.attribute_suggestions:
+              for s in property_job.attribute_suggestions:
                   suggestion_data = {
                       "id": s.id,
                       "name": serialize_langstring(s.name),
@@ -110,7 +110,7 @@ class JsonLineSuggestionJobRepository(SuggestionJobRepositoryPort):
                     lse.officialIdentifier for lse in getattr(s, "isBasedOnLegalStructuralElement", []) or []
                   ]
                   data["suggestions"].append(suggestion_data)
-              for s in job.relationship_suggestions:
+              for s in property_job.relationship_suggestions:
                   suggestion_data = {
                       "id": s.id,
                       "name": serialize_langstring(s.name),

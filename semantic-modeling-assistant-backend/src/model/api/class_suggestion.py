@@ -35,7 +35,7 @@ class ClassSuggestion(BaseModel):
 
 class StartClassSuggestionsTopKExtractionJobRequest(BaseModel):
     """Represents a request to start a job for extracting top-K class suggestions from the given set of paragraphs (structural elements) of a legal act."""
-    k: Optional[int] = Field(default=10, description="Maximal number of top class suggestions to extract in this job (default: 10)")
+    k: int = Field(default=10, description="Maximal number of top class suggestions to extract in this job (default: 10)")
     structural_element_ids: Optional[List[str]] = Field(default=None, description="List of paragraph numbers (structural element IDs) to process by the class extraction job. If not provided, the whole legal act will be processed. However, take into account that processing the whole legal act can exceed the tokens-per-minute limit given by the LLM API provider which would lead to job rejection.")
     context_text: Optional[str] = Field(default=None, description="Additional context text specified by the user to focus suggestion extraction. Be careful in using this as it is not guaranteed to be used in the extraction process. Also take into account that it can break the extraction process if specified maliciously. The job can also be rejected completely if the context is found harmful.")
     known_conceptual_model: Optional[ConceptualModel] = Field(default=None, description="Existing conceptual model to consider during the extraction job. The extraction job will try to generate new suggestions that are semantically close to the existing model and it will try to avoid generating suggestions that are already present in the existing model. If not provided, the job will generate suggestions without considering any existing model.")

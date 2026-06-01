@@ -1,6 +1,6 @@
 import os
 import json
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 from model.domain.suggestion_model import GlobalClassSuggestion, GlobalRelationshipSuggestion, LocalUniversalSuggestion, LegalStructuralElement, LegalAct, LangString
 from infrastructure.repositories.suggestions.SuggestionRepositoryPort import SuggestionRepositoryPort
 
@@ -50,7 +50,7 @@ class FileSystemSuggestionRepository(SuggestionRepositoryPort):
 
             # Build the JSON array in memory
             suggestions_list = [
-                s.model_dump_json(indent=2, by_alias=True, exclude=exclude_keys)
+                s.model_dump_json(indent=2, by_alias=True, exclude=cast(Any, exclude_keys))
                 for s in self.class_suggestions_by_act[legal_act.id].values()
             ]
             json_array = "[\n" + ",\n".join(suggestions_list) + "\n]"
@@ -72,29 +72,29 @@ class FileSystemSuggestionRepository(SuggestionRepositoryPort):
         with open(file_path, "r", encoding="utf-8") as file:
             data = json.load(file)
             for item in data:
-                # Validate isBasedOnLegalAct
-                is_based_on_legal_act = None
-                if "isBasedOnLegalAct" in item and item["isBasedOnLegalAct"].get("id") == legal_act.id:
-                    is_based_on_legal_act = legal_act
+                item_id = item.get("id")
+                item_name = item.get("name")
+                if not isinstance(item_id, str) or not isinstance(item_name, dict):
+                    continue
 
                 # Construct GlobalClassSuggestion instance manually
                 suggestion = GlobalClassSuggestion(
-                    id=item.get("id"),
-                    name=LangString(**item["name"]) if "name" in item else None,
+                    id=item_id,
+                    name=LangString(**item_name),
                     definition=LangString(**item["definition"]) if "definition" in item and item["definition"] is not None else None,
                     explanation=LangString(**item["explanation"]) if "explanation" in item and item["explanation"] is not None else None,
-                    isBasedOnLegalAct=is_based_on_legal_act,
+                    isBasedOnLegalAct=legal_act,
                     createdFromLocalUniversalSuggestion=[
                         LocalUniversalSuggestion(
-                            id=sub_item.get("id"),
-                            name=LangString(**sub_item["name"]) if "name" in sub_item else None,
+                            id=cast(str, sub_item.get("id")),
+                            name=cast(LangString, LangString(**sub_item["name"]) if "name" in sub_item else None),
                             definition=LangString(**sub_item["definition"]) if "definition" in sub_item and sub_item["definition"] is not None else None,
                             explanation=LangString(**sub_item["explanation"]) if "explanation" in sub_item and sub_item["explanation"] is not None else None,
-                            isBasedOnLegalStructuralElement=next(
+                            isBasedOnLegalStructuralElement=cast(LegalStructuralElement, next(
                                 (element for element in (legal_act.consistsOf or [])
                                 if element.id == sub_item.get("isBasedOnLegalStructuralElement", {}).get("id")),
                                 None
-                            ),
+                            )),
                             isIntroducedAs=sub_item.get("isIntroducedAs", [])
                         )
                         for sub_item in item.get("createdFromLocalUniversalSuggestion", [])
@@ -109,7 +109,7 @@ class FileSystemSuggestionRepository(SuggestionRepositoryPort):
 
     def get_class_suggestion_by_id(self, legal_act: LegalAct, suggestion_id: str) -> Optional[GlobalClassSuggestion]:
         if legal_act.id not in self.class_suggestions_by_act:
-            if self.get_all_class_suggestions(legal_act.id) == []:
+            if self.get_all_class_suggestions(legal_act) == []:
                 return None
         act_dict = self.class_suggestions_by_act[legal_act.id]
         if suggestion_id in act_dict:
@@ -150,7 +150,7 @@ class FileSystemSuggestionRepository(SuggestionRepositoryPort):
 
             # Build the JSON array in memory
             suggestions_list = [
-                s.model_dump_json(indent=2, by_alias=True, exclude=exclude_keys)
+                s.model_dump_json(indent=2, by_alias=True, exclude=cast(Any, exclude_keys))
                 for s in self.relationship_suggestions_by_act[legal_act.id].values()
             ]
             json_array = "[\n" + ",\n".join(suggestions_list) + "\n]"
@@ -191,14 +191,13 @@ class FileSystemSuggestionRepository(SuggestionRepositoryPort):
                     # Skip items that are not dictionaries
                     continue
 
-                # Validate isBasedOnLegalAct
-                is_based_on_legal_act = None
-                # Check if 'isBasedOnLegalAct' exists and is a dictionary before accessing 'get'
-                if "isBasedOnLegalAct" in item and isinstance(item["isBasedOnLegalAct"], dict) and item["isBasedOnLegalAct"].get("id") == legal_act.id:
-                    is_based_on_legal_act = legal_act
+                item_id = item.get("id")
+                item_name = item.get("name")
+                if not isinstance(item_id, str) or not isinstance(item_name, dict):
+                    continue
 
                 # Construct mediatesClass list
-                mediated_classes = []
+                mediated_classes: list[GlobalClassSuggestion] = []
                 # Use "mediatesClass" as the key, consistent with saving logic
                 related_class_refs = item.get("mediatesClass", [])
                 if isinstance(related_class_refs, list):
@@ -217,31 +216,31 @@ class FileSystemSuggestionRepository(SuggestionRepositoryPort):
                 try:
                     suggestion = GlobalRelationshipSuggestion(
                         # Use .get() for safety, provide default None or raise error if ID is mandatory
-                        id=item.get("id"),
+                        id=item_id,
                         # Add isinstance checks for LangString safety
-                        name=LangString(**item["name"]) if "name" in item and isinstance(item["name"], dict) else None,
+                        name=LangString(**item_name),
                         definition=LangString(**item["definition"]) if "definition" in item and isinstance(item["definition"], dict) else None,
                         explanation=LangString(**item["explanation"]) if "explanation" in item and isinstance(item["explanation"], dict) else None,
-                        isBasedOnLegalAct=is_based_on_legal_act,
+                        isBasedOnLegalAct=legal_act,
                         createdFromLocalUniversalSuggestion=[
                             LocalUniversalSuggestion(
-                                id=sub_item.get("id"),
-                                name=LangString(**sub_item["name"]) if "name" in sub_item and isinstance(sub_item["name"], dict) else None,
+                                id=cast(str, sub_item.get("id")),
+                                name=cast(LangString, LangString(**sub_item["name"]) if "name" in sub_item and isinstance(sub_item["name"], dict) else None),
                                 definition=LangString(**sub_item["definition"]) if "definition" in sub_item and isinstance(sub_item["definition"], dict) else None,
                                 explanation=LangString(**sub_item["explanation"]) if "explanation" in sub_item and isinstance(sub_item["explanation"], dict) else None,
-                                isBasedOnLegalStructuralElement=next(
+                                isBasedOnLegalStructuralElement=cast(LegalStructuralElement, next(
                                     (element for element in (legal_act.consistsOf or [])
                                     # Add check for sub_item dict structure
                                     if isinstance(sub_item.get("isBasedOnLegalStructuralElement"), dict) and element.id == sub_item.get("isBasedOnLegalStructuralElement", {}).get("id")),
                                     None
-                                ),
+                                )),
                                 isIntroducedAs=sub_item.get("isIntroducedAs", [])
                             )
                             # Add check if sub_item is a dict
                             for sub_item in item.get("createdFromLocalUniversalSuggestion", []) if isinstance(sub_item, dict)
                         ],
                         isRelationship=item.get("isRelationship", False),
-                        mediatesClass=mediated_classes # Assign the correctly constructed list
+                        mediatesClass=cast(Any, mediated_classes) # Assign the correctly constructed list
                     )
                     # Only add valid suggestions
                     if suggestion.id:

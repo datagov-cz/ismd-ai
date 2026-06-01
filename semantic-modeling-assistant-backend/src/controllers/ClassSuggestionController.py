@@ -3,13 +3,14 @@ from services.ClassSuggestionService import ClassSuggestionService
 from services.AuthenticationService import get_authenticated_user_id
 from services.TokenRateLimiter import DailyTokenLimitExceeded
 from uuid import UUID
-from typing import List
+from typing import List, cast
 
 from model.api.class_suggestion import (
     StartClassSuggestionsJobResponse,
     StartClassSuggestionsTopKExtractionJobRequest,
     ClassSuggestionsJobStatusResponse
 )
+from model.domain.suggestion_model import GlobalClassSuggestion
 
 from controllers._utils import (
     _translate_api_conceptual_model_to_domain_conceptual_model,
@@ -68,7 +69,7 @@ def get_class_suggestion_router(service: ClassSuggestionService) -> APIRouter:
         job = service.get_job_status(job_id)
         if job is None:
             raise HTTPException(status_code=404, detail="Job not found")
-        suggestions = [_translate_domain_to_api_class_suggestion(s) for s in (job.suggestions or [])]
+        suggestions = [_translate_domain_to_api_class_suggestion(cast(GlobalClassSuggestion, s)) for s in (job.suggestions or [])]
         return ClassSuggestionsJobStatusResponse(
             job_id=job.job_id,
             status=job.status,
