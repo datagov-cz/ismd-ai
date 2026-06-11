@@ -1,14 +1,55 @@
-import base64
-import json
+import os
 from typing import Optional
 
 from fastapi import HTTPException, Request, status
 
+try:
+    import jwt
+    from jwt import PyJWKClient
+except ImportError:
+    jwt = None
+    PyJWKClient = None
+
 
 class AuthenticationService:
-    def __init__(self, user_keys: list[dict], oidc_user_id_claims: list[str]):
+    def __init__(
+        self,
+        user_keys: list[dict],
+        oidc_user_id_claims: list[str],
+        oidc_issuer_url: Optional[str] = None,
+        oidc_audience: Optional[str] = None,
+        oidc_jwks_url: Optional[str] = None,
+        oidc_algorithms: Optional[list[str]] = None,
+    ):
         self.user_keys = user_keys
         self.oidc_user_id_claims = oidc_user_id_claims
+        self.oidc_issuer_url = oidc_issuer_url.rstrip("/") if oidc_issuer_url else None
+        self.oidc_audience = oidc_audience
+        self.oidc_algorithms = oidc_algorithms or ["RS256"]
+        self.jwks_client = None
+
+        if self.oidc_issuer_url and self.oidc_audience and oidc_jwks_url and PyJWKClient:
+            self.jwks_client = PyJWKClient(oidc_jwks_url)
+
+    @classmethod
+    def from_environment(
+        cls,
+        user_keys: list[dict],
+        oidc_user_id_claims: list[str],
+    ) -> "AuthenticationService":
+        algorithms = [
+            algorithm.strip()
+            for algorithm in os.getenv("OIDC_ALGORITHMS", "RS256").split(",")
+            if algorithm.strip()
+        ]
+        return cls(
+            user_keys=user_keys,
+            oidc_user_id_claims=oidc_user_id_claims,
+            oidc_issuer_url=os.getenv("OIDC_ISSUER_URL"),
+            oidc_audience=os.getenv("OIDC_AUDIENCE"),
+            oidc_jwks_url=os.getenv("OIDC_JWKS_URL"),
+            oidc_algorithms=algorithms,
+        )
 
     def authenticate(
         self,
@@ -52,28 +93,31 @@ class AuthenticationService:
         if scheme.lower() != "bearer" or not token:
             return None
 
-        claims = self._decode_unverified_jwt_claims(token)
+        claims = self._decode_verified_jwt_claims(token)
         for claim_name in self.oidc_user_id_claims:
             claim_value = claims.get(claim_name)
             if isinstance(claim_value, str) and claim_value.strip():
                 return claim_value
         return None
 
-    def _decode_unverified_jwt_claims(self, token: str) -> dict:
-        parts = token.split(".")
-        if len(parts) < 2:
+    def _decode_verified_jwt_claims(self, token: str) -> dict:
+        if not self.jwks_client or jwt is None:
             return {}
 
-        payload = parts[1]
-        payload += "=" * (-len(payload) % 4)
         try:
-            decoded = base64.urlsafe_b64decode(payload.encode("ascii"))
-            claims = json.loads(decoded.decode("utf-8"))
+            signing_key = self.jwks_client.get_signing_key_from_jwt(token)
+            claims = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=self.oidc_algorithms,
+                audience=self.oidc_audience,
+                issuer=self.oidc_issuer_url,
+                options={"require": ["exp", "iat", "iss", "aud"]},
+            )
         except Exception:
             return {}
 
         return claims if isinstance(claims, dict) else {}
-
 
 def get_authenticated_user_id(request: Request) -> str:
     user_id = getattr(request.state, "authenticated_user_id", None)

@@ -36,8 +36,16 @@ class PropertySuggestionService:
 
     def get_job_status(
             self,
-            job_id: UUID) -> PropertySuggestionJob:
+            job_id: UUID,
+            user_id: str,
+            legal_act_key: Optional[str] = None) -> Optional[PropertySuggestionJob]:
         job_base = self.job_repo.get(job_id)
+        if job_base is None:
+            return None
+        if job_base.owner_user_id != user_id:
+            return None
+        if legal_act_key is not None and job_base.legal_act_key != legal_act_key:
+            return None
         job = cast(PropertySuggestionJob, job_base)
         return job
 
@@ -51,14 +59,14 @@ class PropertySuggestionService:
             selected_class_id: str,
             context_text: Optional[str] = None,
             known_conceptual_model: Optional[ConceptualModel] = None,
-            user_id: Optional[str] = None
+            user_id: str = ""
         ) -> PropertySuggestionJob:
-        if user_id:
-            self.token_rate_limiter.ensure_available(user_id)
+        self.token_rate_limiter.ensure_available(user_id)
         key = f"https://opendata.eselpoint.cz/esel-esb/eli/cz/sb/{year}/{number}/{date}"
         job_id = uuid4()
         job = PropertySuggestionJob(
             job_id=job_id,
+            owner_user_id=user_id,
             legal_act_key=key,
             k=k,
             structural_element_ids=structural_element_ids,

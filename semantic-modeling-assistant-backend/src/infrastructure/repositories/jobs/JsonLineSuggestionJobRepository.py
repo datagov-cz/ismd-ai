@@ -26,6 +26,7 @@ class JsonLineSuggestionJobRepository(SuggestionJobRepositoryPort):
         """
         data: dict[str, Any] = {
             "job_id": str(job.job_id),
+            "owner_user_id": job.owner_user_id,
             "legal_act_key": job.legal_act_key,
             "k": job.k,
             "structural_element_ids": job.structural_element_ids,

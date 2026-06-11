@@ -13,6 +13,7 @@ class SuggestionJob(BaseModel):
     def end(self):
         self.ended_at = datetime.now()
     job_id: UUID
+    owner_user_id: str
     legal_act_key: str
     k: int
     structural_element_ids: Optional[List[str]] = None

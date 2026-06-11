@@ -1,6 +1,7 @@
 from typing import Optional
 
 from fastapi import FastAPI, Depends, Header, Request
+from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 
 from controllers.ClassSuggestionController import get_class_suggestion_router
@@ -51,7 +52,7 @@ oidc_user_id_claims = [
     for claim in os.getenv("OIDC_USER_ID_CLAIMS", "sub,preferred_username").split(",")
     if claim.strip()
 ]
-authentication_service = AuthenticationService(USER_KEYS_LIST, oidc_user_id_claims)
+authentication_service = AuthenticationService.from_environment(USER_KEYS_LIST, oidc_user_id_claims)
 
 def authenticate_request(
     request: Request,
@@ -83,9 +84,9 @@ def set_app_Methodology_PromptsInEnglish(model: str, provider: str):
   property_router = get_property_suggestion_router(property_service)
 
   accepted_repo = SuggestionEvaluationRepository(f"{data_directory}/logs/{llm_identifier}/methodology_prompts_in_english_accepted_suggestions.jsonl")
-  accepted_service = AcceptedSuggestionService(accepted_repo)
-  liked_service = LikedSuggestionService(accepted_repo)
-  disliked_service = DislikedSuggestionService(accepted_repo)
+  accepted_service = AcceptedSuggestionService(accepted_repo, job_repo)
+  liked_service = LikedSuggestionService(accepted_repo, job_repo)
+  disliked_service = DislikedSuggestionService(accepted_repo, job_repo)
   accepted_router = get_accepted_suggestion_router(accepted_service)
   liked_router = get_liked_suggestion_router(liked_service)
   disliked_router = get_disliked_suggestion_router(disliked_service)
@@ -115,6 +116,42 @@ app.include_router(accepted_router)
 app.include_router(liked_router)
 app.include_router(disliked_router)
 app.include_router(get_token_usage_router(token_rate_limiter))
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version="0.1.0",
+        routes=app.routes,
+    )
+    components = openapi_schema.setdefault("components", {})
+    security_schemes = components.setdefault("securitySchemes", {})
+    security_schemes["LegacyUserId"] = {
+        "type": "apiKey",
+        "in": "header",
+        "name": "user-id",
+        "description": "Legacy static credential user identifier. Must be sent together with the password header.",
+    }
+    security_schemes["LegacyUserPassword"] = {
+        "type": "apiKey",
+        "in": "header",
+        "name": "password",
+        "description": "Legacy static credential. Must be sent together with the user-id header.",
+    }
+    security_schemes["OIDCBearer"] = {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+    }
+    openapi_schema["security"] = [
+        {"LegacyUserId": [], "LegacyUserPassword": []},
+        {"OIDCBearer": []},
+    ]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 if static_director:
     print("INFO:     Serving frontend files.")

@@ -73,10 +73,24 @@ For OAuth2/OIDC deployments such as Keycloak, the API can also resolve the user 
 Authorization: Bearer <oidc-access-token>
 ```
 
-The token is expected to be validated by deployment infrastructure. This repository does not contain a Keycloak-specific implementation. The API reads the authenticated user ID from OIDC claims, using `sub` first and `preferred_username` second by default. Override the claim list with:
+Bearer tokens are verified by the API before claims are trusted. Configure the expected issuer, audience, and JWKS endpoint:
+
+```bash
+OIDC_ISSUER_URL=https://keycloak.example/realms/my-realm
+OIDC_AUDIENCE=semantic-modeling-assistant
+OIDC_JWKS_URL=https://keycloak.example/realms/my-realm/protocol/openid-connect/certs
+```
+
+If these values are not configured, bearer-token authentication fails closed and the legacy static credential headers remain available. The API reads the authenticated user ID from OIDC claims, using `sub` first and `preferred_username` second by default. Override the claim list with:
 
 ```bash
 OIDC_USER_ID_CLAIMS=sub,preferred_username,email
+```
+
+The default accepted JWT signing algorithm is `RS256`. Override it only if your identity provider requires a different asymmetric algorithm:
+
+```bash
+OIDC_ALGORITHMS=RS256
 ```
 
 ## API Endpoints

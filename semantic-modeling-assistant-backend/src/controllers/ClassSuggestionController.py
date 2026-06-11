@@ -58,6 +58,7 @@ def get_class_suggestion_router(service: ClassSuggestionService) -> APIRouter:
         description="Get the status of a class suggestions job by job ID received when starting the job.The status contains the status information about the job and the list of new class suggestions extracted since the job was started. After the job is completed, no more suggestions will be added to this list."
     )
     def get_class_suggestion_job_status(
+        http_request: Request,
         number: int = Path(..., description="Official number of the legal act"),
         year: int = Path(..., description="Year of the legal act"),
         date: str = Path(..., description="Date identifying the version of the legal act (YYYY-MM-DD)"),
@@ -66,7 +67,12 @@ def get_class_suggestion_router(service: ClassSuggestionService) -> APIRouter:
         """
         Get the status of the given class suggestions job.
         """
-        job = service.get_job_status(job_id)
+        legal_act_key = f"https://opendata.eselpoint.cz/esel-esb/eli/cz/sb/{year}/{number}/{date}"
+        job = service.get_job_status(
+            job_id,
+            user_id=get_authenticated_user_id(http_request),
+            legal_act_key=legal_act_key,
+        )
         if job is None:
             raise HTTPException(status_code=404, detail="Job not found")
         suggestions = [_translate_domain_to_api_class_suggestion(cast(GlobalClassSuggestion, s)) for s in (job.suggestions or [])]
