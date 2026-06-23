@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, List, Union
+from typing import Optional, List
 from uuid import UUID
 from .attribute_suggestion import AttributeSuggestion
 from .relationship_suggestion import RelationshipSuggestion
@@ -7,7 +7,7 @@ from .conceptual_model import ConceptualModel
 
 class StartPropertySuggestionsTopKExtractionJobRequest(BaseModel):
     """Represents a request to start a job for extracting top-K property suggestions (i.e. mix of attributes and relationships) from the given set of paragraphs (structural elements) of a legal act for the given class."""
-    k: int = Field(default=10, ge=1, le=50, description="Maximal number of top property suggestions to extract in this job (default: 10)")
+    k: Optional[int] = Field(ge=1, le=50, description="Maximal number of top property suggestions to extract in this job")
     selected_class_id: str = Field(max_length=256, description="The ID of the class for which property suggestions are to be generated. This includes attributes owned by the class and relationships mediating the class with another class. If the other class does not exist in the known conceptual model, it will extracted as a new class suggestion but only with name, its definition and explanation will not be generated.")
     structural_element_ids: Optional[List[str]] = Field(default=None, max_length=200, description="The IDs of the structural elements (paragraphs) from which to extract property suggestions. If not provided, the whole legal text will be considered. However, take into account that in that case, the limits given by the LLM API provider, e.g. context window size or transactions-per-minute, can be exceeded resulting in the job failure.")
     context_text: Optional[str] = Field(default=None, max_length=4000, description="Additional context text specified by the user to focus suggestion extraction. Be careful in using this as it is not guaranteed to be used in the extraction process. Also take into account that it can break the extraction process if specified maliciously. The job can also be rejected completely if the context is found harmful.")

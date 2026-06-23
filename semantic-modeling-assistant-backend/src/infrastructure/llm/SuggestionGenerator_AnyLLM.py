@@ -42,7 +42,7 @@ class SuggestionGenerator_AnyLLM(SuggestionGeneratorPort):
         token_rate_limiter: Optional[DailyTokenRateLimiter] = None,
     ):
         self.prompt_constructor = prompt_constructor
-        self.model = model or os.getenv("LLM_MODEL", "gpt-4.1")
+        self.model = model or os.getenv("LLM_MODEL", "gpt-5.5")
         self.provider = provider or os.getenv("LLM_PROVIDER", "openai")
         self.language = language
         self.api_key = os.getenv("LLM_API_KEY")

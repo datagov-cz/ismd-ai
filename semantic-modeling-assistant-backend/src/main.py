@@ -101,9 +101,9 @@ def set_app_Methodology_PromptsInEnglish(model: str, provider: str):
 app = FastAPI(dependencies=[Depends(authenticate_request)])
 
 llm_provider = os.getenv("LLM_PROVIDER", "openai")
-llm_model = os.getenv("LLM_MODEL", "gpt-4.1")
+llm_model = os.getenv("LLM_MODEL", "gpt-5.5")
 
-#(class_router, attribute_router, relationship_router, property_router) = set_app_Methodology_PromptsInEnglish("gpt-4.1-mini", "openai")
+#(class_router, attribute_router, relationship_router, property_router) = set_app_Methodology_PromptsInEnglish("gpt-5.5", "openai")
 (class_router,
  property_router,
  accepted_router,

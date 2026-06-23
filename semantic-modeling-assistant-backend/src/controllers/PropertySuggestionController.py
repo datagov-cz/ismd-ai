@@ -3,12 +3,16 @@ from services.PropertySuggestionService import PropertySuggestionService
 from services.AuthenticationService import get_authenticated_user_id
 from services.TokenRateLimiter import DailyTokenLimitExceeded
 from uuid import UUID
-from typing import List
 
 from model.api.property_suggestion import (
     StartPropertySuggestionsTopKExtractionJobRequest,
     StartPropertySuggestionsJobResponse,
     PropertySuggestionsJobStatusResponse
+)
+from model.api.relationship_suggestion import (
+    StartRelationshipSuggestionsTopKExtractionJobRequest,
+    StartRelationshipSuggestionsJobResponse,
+    RelationshipSuggestionsJobStatusResponse,
 )
 from controllers._utils import (
     _translate_api_conceptual_model_to_domain_conceptual_model,
@@ -36,7 +40,7 @@ def get_property_suggestion_router(service: PropertySuggestionService) -> APIRou
         try:
             job = await service.start_property_suggestions_top_k_extraction_job(
                 number, year, date,
-                request.k,
+                request.k or 10,
                 request.structural_element_ids,
                 str(request.selected_class_id),
                 request.context_text,
@@ -86,6 +90,69 @@ def get_property_suggestion_router(service: PropertySuggestionService) -> APIRou
             selected_class_id=job.selected_class_id,
             status=job.status,
             new_attribute_suggestions=attr_suggestions,
+            new_relationship_suggestions=rel_suggestions
+        )
+
+    @router.post(
+        "/legal-acts/{year}/{number}/{date}/relationship-suggestions-top-k-extraction-jobs",
+        status_code=status.HTTP_202_ACCEPTED,
+        response_model=StartRelationshipSuggestionsJobResponse,
+        summary="Start a top-K relationship suggestions extraction job",
+        description="Starts a job to extract top-K relationship suggestions for specific structural elements of a legal act and for a specific class. After the job is started, it will run asynchronously and can be checked for status using the job ID."
+    )
+    async def start_relationship_suggestions_top_k_extraction_job(
+        request: StartRelationshipSuggestionsTopKExtractionJobRequest,
+        http_request: Request,
+        number: int = Path(..., description="Official number of the legal act"),
+        year: int = Path(..., description="Year of the legal act"),
+        date: str = Path(..., description="Date identifying the version of the legal act (YYYY-MM-DD)")
+    ) -> StartRelationshipSuggestionsJobResponse:
+        try:
+            job = await service.start_property_suggestions_top_k_extraction_job(
+                number, year, date,
+                request.k or 10,
+                request.structural_element_ids,
+                str(request.selected_class_id),
+                request.context_text,
+                _translate_api_conceptual_model_to_domain_conceptual_model(request.known_conceptual_model),
+                user_id=get_authenticated_user_id(http_request)
+            )
+        except DailyTokenLimitExceeded as exc:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
+        return StartRelationshipSuggestionsJobResponse(
+            job_id=job.job_id,
+            selected_class_id=job.selected_class_id,
+            status=job.status
+        )
+
+    @router.get(
+        "/legal-acts/{year}/{number}/{date}/relationship-suggestions-jobs/{job_id}",
+        response_model=RelationshipSuggestionsJobStatusResponse,
+        summary="Get relationship suggestion job status",
+        description="Get the status of a relationship suggestions job by job ID received when starting the job. The status contains the status information about the job and the list of new relationship suggestions extracted since the job was started. After the job is completed, no more suggestions will be added to this list."
+    )
+    def get_relationship_suggestion_job_status(
+        http_request: Request,
+        number: int = Path(..., description="Official number of the legal act"),
+        year: int = Path(..., description="Year of the legal act"),
+        date: str = Path(..., description="Date identifying the version of the legal act (YYYY-MM-DD)"),
+        job_id: UUID = Path(..., description="Job ID")
+    ) -> RelationshipSuggestionsJobStatusResponse:
+        legal_act_key = f"https://opendata.eselpoint.cz/esel-esb/eli/cz/sb/{year}/{number}/{date}"
+        job = service.get_job_status(
+            job_id,
+            user_id=get_authenticated_user_id(http_request),
+            legal_act_key=legal_act_key,
+        )
+        if job is None:
+            raise HTTPException(status_code=404, detail="Job not found")
+        rel_suggestions = [
+            _translate_domain_to_api_relationship_suggestion(s) for s in (job.relationship_suggestions or [])
+        ]
+        return RelationshipSuggestionsJobStatusResponse(
+            job_id=job.job_id,
+            selected_class_id=job.selected_class_id,
+            status=job.status,
             new_relationship_suggestions=rel_suggestions
         )
 

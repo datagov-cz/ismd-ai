@@ -23,7 +23,7 @@ Set the provider and model with environment variables:
 
 ```bash
 LLM_PROVIDER=openai
-LLM_MODEL=gpt-4.1
+LLM_MODEL=gpt-5.5
 ```
 
 Provider-specific credentials are read from the environment by `any-llm`, such as
@@ -599,7 +599,7 @@ Key dependencies include:
 ### Environment Variables
 ```bash
 LLM_PROVIDER=openai
-LLM_MODEL=gpt-4.1
+LLM_MODEL=gpt-5.5
 OPENAI_API_KEY=your-openai-api-key
 USER_KEYS=[{"user_id": "user1", "password": "pass1"}]
 DATA_DIRECTORY=optional-path-where-to-save-data
