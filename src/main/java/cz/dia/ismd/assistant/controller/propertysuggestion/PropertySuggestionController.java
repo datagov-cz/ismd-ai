@@ -43,11 +43,8 @@ public class PropertySuggestionController {
         return new SelectedClassJobStartResponse(job.jobId(), job.selectedClassId(), job.status());
     }
 
-    @GetMapping("/legal-acts/{year}/{number}/{date}/property-suggestions-jobs/{jobId}")
+    @GetMapping("/legal-acts/property-suggestions-jobs/{jobId}")
     public PropertySuggestionsJobResponse getPropertySuggestions(
-            @PathVariable int year,
-            @PathVariable int number,
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @PathVariable UUID jobId
     ) {
         SuggestionJob job = suggestionJobService.get(jobId);

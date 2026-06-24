@@ -43,11 +43,8 @@ public class ClassSuggestionController {
         return new JobStartResponse(job.jobId(), job.status());
     }
 
-    @GetMapping("/legal-acts/{year}/{number}/{date}/class-suggestions-jobs/{jobId}")
+    @GetMapping("/legal-acts/class-suggestions-jobs/{jobId}")
     public ClassSuggestionsJobResponse getClassSuggestions(
-            @PathVariable int year,
-            @PathVariable int number,
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @PathVariable UUID jobId
     ) {
         SuggestionJob job = suggestionJobService.get(jobId);
