@@ -1,24 +1,35 @@
-# Use the official Python image as a base image
-FROM python:3.13.5
+FROM maven:3.9.9-eclipse-temurin-17 AS build
 
-# Set the working directory in the container
-WORKDIR /opt/semantic-modeling-assistant
+WORKDIR /workspace
 
-# Copy the requirements file into the container
-COPY requirements.txt .
+COPY pom.xml .
+RUN mvn -B dependency:go-offline
 
-# Install the Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+COPY src ./src
+RUN mvn -B package
 
-# Copy the rest of the application code into the container
-COPY . .
+FROM eclipse-temurin:17-jre
 
-# Expose the port the app runs on
-EXPOSE 5000
+WORKDIR /app
 
-# Default data storage path.
-ENV DATA_DIRECTORY=/data
+RUN groupadd --system app && useradd --system --gid app app
 
-# Get to the right directory.
-WORKDIR /opt/semantic-modeling-assistant/src
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
+COPY --from=build /workspace/target/*.jar app.jar
+
+RUN mkdir -p /data && chown -R app:app /app /data
+
+USER app
+
+ENV APP_FEEDBACK_DB_PATH=/data/feedback.sqlite \
+    APP_LLM_ENABLED=false \
+    APP_LLM_PROVIDER=OPENAI \
+    APP_LLM_MODEL=gpt-4o-mini \
+    APP_LLM_API_KEY="" \
+    APP_LLM_ENDPOINT_URL="" \
+    APP_LLM_MAX_TOKENS=1024 \
+    APP_LLM_TEMPERATURE=0.2 \
+    APP_LLM_TIMEOUT=60s
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
