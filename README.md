@@ -2,6 +2,10 @@
 
 A Spring Boot REST API for asynchronous semantic modeling suggestions.
 
+## Important TODOs
+
+* Implement mock responses for development environment
+
 ## Run
 
 ```bash

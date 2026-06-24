@@ -5,6 +5,8 @@ import cz.dia.ismd.assistant.data.suggestion.SuggestionJob;
 import cz.dia.ismd.assistant.dto.classsuggestion.ClassSuggestionJobRequest;
 import cz.dia.ismd.assistant.dto.classsuggestion.ClassSuggestionsJobResponse;
 import cz.dia.ismd.assistant.dto.classsuggestion.JobStartResponse;
+import cz.dia.ismd.assistant.service.environment.ApiEnvironment;
+import cz.dia.ismd.assistant.service.mock.DevelopmentApiResponses;
 import cz.dia.ismd.assistant.service.suggestion.SuggestionJobService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -27,9 +29,17 @@ import java.util.UUID;
 public class ClassSuggestionController {
 
     private final SuggestionJobService suggestionJobService;
+    private final ApiEnvironment apiEnvironment;
+    private final DevelopmentApiResponses developmentApiResponses;
 
-    public ClassSuggestionController(SuggestionJobService suggestionJobService) {
+    public ClassSuggestionController(
+            SuggestionJobService suggestionJobService,
+            ApiEnvironment apiEnvironment,
+            DevelopmentApiResponses developmentApiResponses
+    ) {
         this.suggestionJobService = suggestionJobService;
+        this.apiEnvironment = apiEnvironment;
+        this.developmentApiResponses = developmentApiResponses;
     }
 
     @PostMapping("/legal-acts/{year}/{number}/{date}/class-suggestions-top-k-extraction-jobs")
@@ -41,6 +51,9 @@ public class ClassSuggestionController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody ClassSuggestionJobRequest request
     ) {
+        if (apiEnvironment.isDevelopment()) {
+            return developmentApiResponses.startClassSuggestions();
+        }
         SuggestionJob job = suggestionJobService.startClassJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
         return new JobStartResponse(job.jobId(), job.status());
     }
@@ -49,6 +62,9 @@ public class ClassSuggestionController {
     public List<ClassSuggestionsJobResponse> getClassSuggestions(
             @RequestParam List<UUID> jobIds
     ) {
+        if (apiEnvironment.isDevelopment()) {
+            return developmentApiResponses.classSuggestions();
+        }
         return suggestionJobService.getAll(jobIds).stream()
                 .map(this::toResponse)
                 .toList();

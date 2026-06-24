@@ -5,6 +5,8 @@ import cz.dia.ismd.assistant.dto.propertysuggestion.SelectedClassJobStartRespons
 import cz.dia.ismd.assistant.dto.relationshipsuggestion.RelationshipSuggestionJobRequest;
 import cz.dia.ismd.assistant.dto.relationshipsuggestion.RelationshipSuggestionsJobResponse;
 import cz.dia.ismd.assistant.records.suggestion.DocumentContext;
+import cz.dia.ismd.assistant.service.environment.ApiEnvironment;
+import cz.dia.ismd.assistant.service.mock.DevelopmentApiResponses;
 import cz.dia.ismd.assistant.service.suggestion.SuggestionJobService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -27,9 +29,17 @@ import java.util.UUID;
 public class RelationshipSuggestionController {
 
     private final SuggestionJobService suggestionJobService;
+    private final ApiEnvironment apiEnvironment;
+    private final DevelopmentApiResponses developmentApiResponses;
 
-    public RelationshipSuggestionController(SuggestionJobService suggestionJobService) {
+    public RelationshipSuggestionController(
+            SuggestionJobService suggestionJobService,
+            ApiEnvironment apiEnvironment,
+            DevelopmentApiResponses developmentApiResponses
+    ) {
         this.suggestionJobService = suggestionJobService;
+        this.apiEnvironment = apiEnvironment;
+        this.developmentApiResponses = developmentApiResponses;
     }
 
     @PostMapping("/legal-acts/{year}/{number}/{date}/relationship-suggestions-top-k-extraction-jobs")
@@ -41,6 +51,9 @@ public class RelationshipSuggestionController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody RelationshipSuggestionJobRequest request
     ) {
+        if (apiEnvironment.isDevelopment()) {
+            return developmentApiResponses.startRelationshipSuggestions();
+        }
         SuggestionJob job = suggestionJobService.startRelationshipJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
         return new SelectedClassJobStartResponse(job.jobId(), job.selectedClassId(), job.status());
     }
@@ -49,6 +62,9 @@ public class RelationshipSuggestionController {
     public List<RelationshipSuggestionsJobResponse> getRelationshipSuggestions(
             @RequestParam List<UUID> jobIds
     ) {
+        if (apiEnvironment.isDevelopment()) {
+            return developmentApiResponses.relationshipSuggestions();
+        }
         return suggestionJobService.getAll(jobIds).stream()
                 .map(this::toResponse)
                 .toList();

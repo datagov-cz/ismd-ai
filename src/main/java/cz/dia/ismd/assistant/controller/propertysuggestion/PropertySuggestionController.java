@@ -5,6 +5,8 @@ import cz.dia.ismd.assistant.dto.propertysuggestion.PropertySuggestionsJobRespon
 import cz.dia.ismd.assistant.dto.propertysuggestion.SelectedClassJobStartResponse;
 import cz.dia.ismd.assistant.data.suggestion.SuggestionJob;
 import cz.dia.ismd.assistant.records.suggestion.DocumentContext;
+import cz.dia.ismd.assistant.service.environment.ApiEnvironment;
+import cz.dia.ismd.assistant.service.mock.DevelopmentApiResponses;
 import cz.dia.ismd.assistant.service.suggestion.SuggestionJobService;
 import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -27,9 +29,17 @@ import java.util.UUID;
 public class PropertySuggestionController {
 
     private final SuggestionJobService suggestionJobService;
+    private final ApiEnvironment apiEnvironment;
+    private final DevelopmentApiResponses developmentApiResponses;
 
-    public PropertySuggestionController(SuggestionJobService suggestionJobService) {
+    public PropertySuggestionController(
+            SuggestionJobService suggestionJobService,
+            ApiEnvironment apiEnvironment,
+            DevelopmentApiResponses developmentApiResponses
+    ) {
         this.suggestionJobService = suggestionJobService;
+        this.apiEnvironment = apiEnvironment;
+        this.developmentApiResponses = developmentApiResponses;
     }
 
     @PostMapping("/legal-acts/{year}/{number}/{date}/property-suggestions-top-k-extraction-jobs")
@@ -41,6 +51,9 @@ public class PropertySuggestionController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody PropertySuggestionJobRequest request
     ) {
+        if (apiEnvironment.isDevelopment()) {
+            return developmentApiResponses.startPropertySuggestions();
+        }
         SuggestionJob job = suggestionJobService.startPropertyJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
         return new SelectedClassJobStartResponse(job.jobId(), job.selectedClassId(), job.status());
     }
@@ -49,6 +62,9 @@ public class PropertySuggestionController {
     public List<PropertySuggestionsJobResponse> getPropertySuggestions(
             @RequestParam List<UUID> jobIds
     ) {
+        if (apiEnvironment.isDevelopment()) {
+            return developmentApiResponses.propertySuggestions();
+        }
         return suggestionJobService.getAll(jobIds).stream()
                 .map(this::toResponse)
                 .toList();
