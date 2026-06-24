@@ -1,4 +1,4 @@
-package cz.cvut.ismd.assistant.main;
+package cz.dia.ismd.assistant.main;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

@@ -1,0 +1,56 @@
+package cz.dia.ismd.assistant.service.feedback;
+
+import cz.dia.ismd.assistant.records.feedback.FeedbackRecord;
+import cz.dia.ismd.assistant.data.feedback.FeedbackType;
+import cz.dia.ismd.assistant.service.suggestion.SuggestionJobService;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class FeedbackService {
+
+    private static final RowMapper<FeedbackRecord> FEEDBACK_RECORD_ROW_MAPPER = (resultSet, rowNum) ->
+            new FeedbackRecord(
+                    UUID.fromString(resultSet.getString("job_id")),
+                    resultSet.getString("suggestion_id"),
+                    FeedbackType.valueOf(resultSet.getString("feedback_type")),
+                    Instant.parse(resultSet.getString("created_at"))
+            );
+
+    private final SuggestionJobService suggestionJobService;
+    private final JdbcTemplate jdbcTemplate;
+
+    public FeedbackService(SuggestionJobService suggestionJobService, JdbcTemplate jdbcTemplate) {
+        this.suggestionJobService = suggestionJobService;
+        this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public void record(FeedbackRecord record) {
+        suggestionJobService.ensureExists(record.jobId());
+        jdbcTemplate.update("""
+                        INSERT INTO feedback_records(job_id, suggestion_id, feedback_type, created_at)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                record.jobId().toString(),
+                record.suggestionId(),
+                record.type().name(),
+                record.createdAt().toString());
+    }
+
+    public void record(UUID jobId, String suggestionId, FeedbackType type) {
+        record(new FeedbackRecord(jobId, suggestionId, type, Instant.now()));
+    }
+
+    public List<FeedbackRecord> records() {
+        return jdbcTemplate.query("""
+                SELECT job_id, suggestion_id, feedback_type, created_at
+                FROM feedback_records
+                ORDER BY id
+                """, FEEDBACK_RECORD_ROW_MAPPER);
+    }
+}
