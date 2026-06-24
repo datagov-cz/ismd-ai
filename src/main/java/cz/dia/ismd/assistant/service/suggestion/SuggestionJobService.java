@@ -2,6 +2,7 @@ package cz.dia.ismd.assistant.service.suggestion;
 
 import cz.dia.ismd.assistant.dto.classsuggestion.ClassSuggestionJobRequest;
 import cz.dia.ismd.assistant.dto.propertysuggestion.PropertySuggestionJobRequest;
+import cz.dia.ismd.assistant.dto.relationshipsuggestion.RelationshipSuggestionJobRequest;
 import cz.dia.ismd.assistant.data.suggestion.JobKind;
 import cz.dia.ismd.assistant.data.suggestion.SuggestionJob;
 import cz.dia.ismd.assistant.records.suggestion.DocumentContext;
@@ -58,7 +59,7 @@ public class SuggestionJobService {
         return job;
     }
 
-    public SuggestionJob startRelationshipJob(String userId, DocumentContext context, PropertySuggestionJobRequest request) {
+    public SuggestionJob startRelationshipJob(String userId, DocumentContext context, RelationshipSuggestionJobRequest request) {
         SuggestionJob job = createJob(userId, request.effectiveK(), JobKind.RELATIONSHIP, request.selectedClassId());
         CompletableFuture.runAsync(() -> {
             try {

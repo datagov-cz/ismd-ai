@@ -45,14 +45,6 @@ public class ClassSuggestionController {
         return new JobStartResponse(job.jobId(), job.status());
     }
 
-    @GetMapping("/legal-acts/class-suggestions-jobs/{jobId}")
-    public ClassSuggestionsJobResponse getClassSuggestions(
-            @PathVariable UUID jobId
-    ) {
-        SuggestionJob job = suggestionJobService.get(jobId);
-        return toResponse(job);
-    }
-
     @GetMapping("/legal-acts/class-suggestions-jobs")
     public List<ClassSuggestionsJobResponse> getClassSuggestions(
             @RequestParam List<UUID> jobIds

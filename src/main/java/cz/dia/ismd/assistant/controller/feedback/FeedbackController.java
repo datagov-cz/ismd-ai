@@ -41,7 +41,7 @@ public class FeedbackController {
 
     private void record(List<FeedbackRequest> requests, FeedbackType type) {
         feedbackService.record(requests.stream()
-                .map(request -> request.toRecord(type))
+                .flatMap(request -> request.toRecords(type).stream())
                 .toList());
     }
 }

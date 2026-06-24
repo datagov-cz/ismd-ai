@@ -1,8 +1,8 @@
 package cz.dia.ismd.assistant.controller.relationshipsuggestion;
 
 import cz.dia.ismd.assistant.data.suggestion.SuggestionJob;
-import cz.dia.ismd.assistant.dto.propertysuggestion.PropertySuggestionJobRequest;
 import cz.dia.ismd.assistant.dto.propertysuggestion.SelectedClassJobStartResponse;
+import cz.dia.ismd.assistant.dto.relationshipsuggestion.RelationshipSuggestionJobRequest;
 import cz.dia.ismd.assistant.dto.relationshipsuggestion.RelationshipSuggestionsJobResponse;
 import cz.dia.ismd.assistant.records.suggestion.DocumentContext;
 import cz.dia.ismd.assistant.service.suggestion.SuggestionJobService;
@@ -39,18 +39,10 @@ public class RelationshipSuggestionController {
             @PathVariable int number,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody PropertySuggestionJobRequest request
+            @Valid @RequestBody RelationshipSuggestionJobRequest request
     ) {
         SuggestionJob job = suggestionJobService.startRelationshipJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
         return new SelectedClassJobStartResponse(job.jobId(), job.selectedClassId(), job.status());
-    }
-
-    @GetMapping("/legal-acts/relationship-suggestions-jobs/{jobId}")
-    public RelationshipSuggestionsJobResponse getRelationshipSuggestions(
-            @PathVariable UUID jobId
-    ) {
-        SuggestionJob job = suggestionJobService.get(jobId);
-        return toResponse(job);
     }
 
     @GetMapping("/legal-acts/relationship-suggestions-jobs")

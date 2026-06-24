@@ -45,14 +45,6 @@ public class PropertySuggestionController {
         return new SelectedClassJobStartResponse(job.jobId(), job.selectedClassId(), job.status());
     }
 
-    @GetMapping("/legal-acts/property-suggestions-jobs/{jobId}")
-    public PropertySuggestionsJobResponse getPropertySuggestions(
-            @PathVariable UUID jobId
-    ) {
-        SuggestionJob job = suggestionJobService.get(jobId);
-        return toResponse(job);
-    }
-
     @GetMapping("/legal-acts/property-suggestions-jobs")
     public List<PropertySuggestionsJobResponse> getPropertySuggestions(
             @RequestParam List<UUID> jobIds
