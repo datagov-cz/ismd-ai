@@ -23,7 +23,22 @@ class ClassSuggestionIntegrationTests extends AssistantIntegrationTest {
                                 {
                                   "k": 2,
                                   "structural_element_ids": ["/eli/cz/sb/2024/1/section/1", "/eli/cz/sb/2024/1/section/2"],
-                                  "context_text": "Property rights"
+                                  "context_text": "Property rights",
+                                  "known_conceptual_model": {
+                                    "classes": [
+                                      {
+                                        "suggestion_id": "known-class-001",
+                                        "name": {"cs": "český string", "en": "english string", "fr": "francois"},
+                                        "definition": {"en": "Known definition"},
+                                        "explanation": {"en": "Known explanation"},
+                                        "type": "CLASS",
+                                        "specializes": [],
+                                        "legal_act": "/eli/cz/sb/2024/1"
+                                      }
+                                    ],
+                                    "attributes": [],
+                                    "relationships": []
+                                  }
                                 }
                                 """))
                 .andExpect(status().isAccepted())
@@ -41,7 +56,7 @@ class ClassSuggestionIntegrationTests extends AssistantIntegrationTest {
                 .andExpect(jsonPath("$[0].job_id").value(jobId.toString()))
                 .andExpect(jsonPath("$[0].status").value("completed"))
                 .andExpect(jsonPath("$[0].new_suggestions", hasSize(2)))
-                .andExpect(jsonPath("$[0].new_suggestions[0].name.@value").value("Property Actor"))
+                .andExpect(jsonPath("$[0].new_suggestions[0].name.en").value("Property Actor"))
                 .andExpect(jsonPath("$[0].new_suggestions[0].legal_act").value("/eli/cz/sb/2024/1"));
     }
 

@@ -38,18 +38,18 @@ public class DevelopmentApiResponses {
                 List.of(
                         new ClassSuggestion(
                                 "mock-class-suggestion-001",
-                                LangString.en("Development Class"),
-                                LangString.en("A deterministic class suggestion returned in development."),
-                                LangString.en("This response is independent of the request body."),
+                                LangString.cs("Development Class"),
+                                LangString.cs("A deterministic class suggestion returned in development."),
+                                LangString.cs("This response is independent of the request body."),
                                 TermType.CLASS,
                                 List.of(),
                                 LEGAL_ACT
                         ),
                         new ClassSuggestion(
                                 "mock-class-suggestion-002",
-                                LangString.en("Development Specialization"),
-                                LangString.en("A deterministic specialized class suggestion returned in development."),
-                                LangString.en("This response is independent of the request body."),
+                                LangString.cs("Development Specialization"),
+                                LangString.cs("A deterministic specialized class suggestion returned in development."),
+                                LangString.cs("This response is independent of the request body."),
                                 TermType.CLASS,
                                 List.of(new IdReference("mock-class-suggestion-001")),
                                 LEGAL_ACT
@@ -70,9 +70,9 @@ public class DevelopmentApiResponses {
                 List.of(new AttributeSuggestion(
                         "mock-attribute-suggestion-001",
                         new IdReference(CLASS_ID),
-                        LangString.en("development_attribute"),
-                        LangString.en("A deterministic attribute suggestion returned in development."),
-                        LangString.en("This response is independent of the request body."),
+                        LangString.cs("development_attribute"),
+                        LangString.cs("A deterministic attribute suggestion returned in development."),
+                        LangString.cs("This response is independent of the request body."),
                         LEGAL_ACT
                 ))
         ));
@@ -91,9 +91,9 @@ public class DevelopmentApiResponses {
                         "mock-relationship-suggestion-001",
                         new IdReference(CLASS_ID),
                         new IdReference("mock-target-class-001"),
-                        LangString.en("development_relationship"),
-                        LangString.en("A deterministic relationship suggestion returned in development."),
-                        LangString.en("This response is independent of the request body."),
+                        LangString.cs("development_relationship"),
+                        LangString.cs("A deterministic relationship suggestion returned in development."),
+                        LangString.cs("This response is independent of the request body."),
                         LEGAL_ACT
                 ))
         ));

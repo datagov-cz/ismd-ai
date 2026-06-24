@@ -35,9 +35,9 @@ public class SuggestionGenerator {
             String subject = classSubject(context, request.contextText(), index);
             suggestions.add(new ClassSuggestion(
                     "class_%03d".formatted(index),
-                    LangString.en(subject),
-                    LangString.en("A concept identified from the provided document context."),
-                    LangString.en("Generated from the selected legal text and modeling context."),
+                    LangString.cs(subject),
+                    LangString.cs("A concept identified from the provided document context."),
+                    LangString.cs("Generated from the selected legal text and modeling context."),
                     TermType.CLASS,
                     index == 1 ? List.of() : List.of(new IdReference("class_%03d".formatted(index - 1))),
                     legalAct
@@ -64,9 +64,9 @@ public class SuggestionGenerator {
             suggestions.add(new AttributeSuggestion(
                     "attr_%03d".formatted(index),
                     new IdReference(request.selectedClassId()),
-                    LangString.en(name),
-                    LangString.en("A property of class " + request.selectedClassId() + "."),
-                    LangString.en("Suggested from the selected passages and contextual model."),
+                    LangString.cs(name),
+                    LangString.cs("A property of class " + request.selectedClassId() + "."),
+                    LangString.cs("Suggested from the selected passages and contextual model."),
                     legalAct
 //                    occurrences(index, references),
 //                    references
@@ -86,9 +86,9 @@ public class SuggestionGenerator {
                     "rel_%03d".formatted(index),
                     new IdReference(request.selectedClassId()),
                     new IdReference(targetClassId),
-                    LangString.en(relationshipName(index)),
-                    LangString.en("A relationship involving class " + request.selectedClassId() + "."),
-                    LangString.en("Suggested from co-occurring obligations, rights, or references in the text."),
+                    LangString.cs(relationshipName(index)),
+                    LangString.cs("A relationship involving class " + request.selectedClassId() + "."),
+                    LangString.cs("Suggested from co-occurring obligations, rights, or references in the text."),
                     legalAct
 //                    occurrences(index, references),
 //                    references
