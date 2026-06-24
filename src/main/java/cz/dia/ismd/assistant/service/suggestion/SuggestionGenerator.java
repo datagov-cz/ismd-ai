@@ -64,8 +64,7 @@ public class SuggestionGenerator {
             };
             suggestions.add(new AttributeSuggestion(
                     "attr_%03d".formatted(index),
-                    ATTRIBUTE_TYPE,
-                    request.selectedClassId(),
+                    new IdReference(request.selectedClassId()),
                     LangString.en(name),
                     LangString.en("A property of class " + request.selectedClassId() + "."),
                     LangString.en("Suggested from the selected passages and contextual model."),

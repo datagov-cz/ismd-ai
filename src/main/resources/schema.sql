@@ -1,3 +1,5 @@
+PRAGMA journal_mode=WAL;
+
 CREATE TABLE IF NOT EXISTS feedback_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id TEXT NOT NULL,

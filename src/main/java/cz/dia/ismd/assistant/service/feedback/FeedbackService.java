@@ -24,6 +24,7 @@ public class FeedbackService {
 
     private final SuggestionJobService suggestionJobService;
     private final JdbcTemplate jdbcTemplate;
+    private final Object writeMonitor = new Object();
 
     public FeedbackService(SuggestionJobService suggestionJobService, JdbcTemplate jdbcTemplate) {
         this.suggestionJobService = suggestionJobService;
@@ -32,14 +33,16 @@ public class FeedbackService {
 
     public void record(FeedbackRecord record) {
         suggestionJobService.ensureExists(record.jobId());
-        jdbcTemplate.update("""
-                        INSERT INTO feedback_records(job_id, suggestion_id, feedback_type, created_at)
-                        VALUES (?, ?, ?, ?)
-                        """,
-                record.jobId().toString(),
-                record.suggestionId(),
-                record.type().name(),
-                record.createdAt().toString());
+        synchronized (writeMonitor) {
+            jdbcTemplate.update("""
+                            INSERT INTO feedback_records(job_id, suggestion_id, feedback_type, created_at)
+                            VALUES (?, ?, ?, ?)
+                            """,
+                    record.jobId().toString(),
+                    record.suggestionId(),
+                    record.type().name(),
+                    record.createdAt().toString());
+        }
     }
 
     public void record(UUID jobId, String suggestionId, FeedbackType type) {

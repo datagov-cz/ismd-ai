@@ -9,7 +9,15 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.IntStream;
 
 import static org.hamcrest.Matchers.hasSize;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -175,7 +183,7 @@ class SemanticModelingAssistantApplicationTests {
 
         UUID jobId = UUID.fromString(Json.read(start, "job_id"));
 
-        mockMvc.perform(post("/liked-suggestions")
+        mockMvc.perform(post("/like-suggestion")
                         .with(oidcAuthentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -196,6 +204,58 @@ class SemanticModelingAssistantApplicationTests {
                 "class_001",
                 "LIKED");
         org.assertj.core.api.Assertions.assertThat(records).isEqualTo(1);
+    }
+
+    @Test
+    void recordsConcurrentFeedbackWrites() throws Exception {
+        MvcResult start = mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"k": 1}
+                                """))
+                .andExpect(status().isAccepted())
+                .andReturn();
+
+        UUID jobId = UUID.fromString(Json.read(start, "job_id"));
+        int writeCount = 20;
+        CountDownLatch startGate = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(8);
+
+        try {
+            List<Future<Void>> writes = IntStream.range(0, writeCount)
+                    .mapToObj(index -> executor.submit((Callable<Void>) () -> {
+                        startGate.await();
+                        mockMvc.perform(post("/like-suggestion")
+                                        .with(oidcAuthentication())
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("""
+                                                {
+                                                  "job_id": "%s",
+                                                  "suggestion_id": "class_%03d"
+                                                }
+                                                """.formatted(jobId, index)))
+                                .andExpect(status().isNoContent());
+                        return null;
+                    }))
+                    .toList();
+
+            startGate.countDown();
+            for (Future<Void> write : writes) {
+                write.get(5, TimeUnit.SECONDS);
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        Integer records = jdbcTemplate.queryForObject("""
+                        SELECT COUNT(*)
+                        FROM feedback_records
+                        WHERE job_id = ?
+                        """,
+                Integer.class,
+                jobId.toString());
+        org.assertj.core.api.Assertions.assertThat(records).isEqualTo(writeCount);
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor oidcAuthentication() {
