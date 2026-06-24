@@ -1,6 +1,6 @@
 package cz.dia.ismd.assistant.dto.propertysuggestion;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import cz.dia.ismd.assistant.records.suggestion.KnownConceptualModel;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -12,7 +12,7 @@ public record PropertySuggestionJobRequest(
         @NotBlank String selectedClassId,
         List<String> structuralElementIds,
         String contextText,
-        JsonNode knownConceptualModel
+        KnownConceptualModel knownConceptualModel
 ) {
     public int effectiveK() {
         return k == null ? 5 : k;

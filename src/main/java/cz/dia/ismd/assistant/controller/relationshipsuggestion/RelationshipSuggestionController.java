@@ -44,7 +44,12 @@ public class RelationshipSuggestionController {
     }
 
     @GetMapping("/legal-acts/{year}/{number}/{date}/relationship-suggestions-jobs/{jobId}")
-    public RelationshipSuggestionsJobResponse getRelationshipSuggestions(@PathVariable UUID jobId) {
+    public RelationshipSuggestionsJobResponse getRelationshipSuggestions(
+            @PathVariable int year,
+            @PathVariable int number,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @PathVariable UUID jobId
+    ) {
         SuggestionJob job = suggestionJobService.get(jobId);
         return new RelationshipSuggestionsJobResponse(
                 job.jobId(),

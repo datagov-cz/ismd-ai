@@ -9,8 +9,7 @@ import cz.dia.ismd.assistant.records.suggestion.LocalSuggestionOccurrence;
 import java.util.List;
 
 public record ClassSuggestion(
-        String id,
-        String type,
+        String suggestionID,
         LangString name,
         LangString definition,
         LangString explanation,

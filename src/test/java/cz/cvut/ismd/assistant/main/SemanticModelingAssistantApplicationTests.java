@@ -72,6 +72,54 @@ class SemanticModelingAssistantApplicationTests {
     }
 
     @Test
+    void acceptsYearMonthDayLegalActDateFormat() throws Exception {
+        mockMvc.perform(post("/legal-acts/2026/1/2026-01-01/class-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"k": 1}
+                                """))
+                .andExpect(status().isAccepted());
+
+        mockMvc.perform(post("/legal-acts/2026/1/2026-01-01/property-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "k": 1,
+                                  "selected_class_id": "class_001"
+                                }
+                                """))
+                .andExpect(status().isAccepted());
+
+        mockMvc.perform(post("/legal-acts/2026/1/2026-01-01/relationship-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "k": 1,
+                                  "selected_class_id": "class_001"
+                                }
+                                """))
+                .andExpect(status().isAccepted());
+    }
+
+    @Test
+    void rejectsNonPaddedLegalActDateFormat() throws Exception {
+        mockMvc.perform(post("/legal-acts/2026/1/2026-1-1/class-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"k": 1}
+                                """))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(get("/legal-acts/2026/1/2026-1-1/class-suggestions-jobs/{jobId}", UUID.randomUUID())
+                        .with(oidcAuthentication()))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void validatesSelectedClassForPropertyJobs() throws Exception {
         mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/property-suggestions-top-k-extraction-jobs")
                         .with(oidcAuthentication())

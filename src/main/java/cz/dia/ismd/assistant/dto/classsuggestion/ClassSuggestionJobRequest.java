@@ -1,6 +1,6 @@
 package cz.dia.ismd.assistant.dto.classsuggestion;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import cz.dia.ismd.assistant.records.suggestion.KnownConceptualModel;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 
@@ -10,9 +10,9 @@ public record ClassSuggestionJobRequest(
         @Min(1) @Max(50) Integer k,
         List<String> structuralElementIds,
         String contextText,
-        JsonNode knownConceptualModel
+        KnownConceptualModel knownConceptualModel
 ) {
     public int effectiveK() {
-        return k == null ? 10 : k;
+        return k == null ? 5 : k;
     }
 }

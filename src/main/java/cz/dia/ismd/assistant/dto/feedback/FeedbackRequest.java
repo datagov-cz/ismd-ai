@@ -7,6 +7,6 @@ import java.util.UUID;
 
 public record FeedbackRequest(
         @NotNull UUID jobId,
-        @NotBlank String suggestionId
+        @NotBlank UUID suggestionId
 ) {
 }

@@ -9,10 +9,9 @@ import cz.dia.ismd.assistant.records.suggestion.LocalSuggestionOccurrence;
 import java.util.List;
 
 public record RelationshipSuggestion(
-        String id,
-        String type,
-        String sourceClass,
-        String targetClass,
+        String suggestionID,
+        IdReference sourceClass,
+        IdReference targetClass,
         LangString name,
         LangString definition,
         LangString explanation,

@@ -24,9 +24,7 @@ public class SuggestionGenerator {
     private static final String LEGAL_ACT_TYPE = "http://example.org/LegalAct";
     private static final String PARAGRAPH_TYPE = "http://example.org/Paragraph";
     private static final String LOCAL_SUGGESTION_TYPE = "http://example.org/LocalClassSuggestion";
-    private static final String CLASS_TYPE = "http://example.org/Class";
     private static final String ATTRIBUTE_TYPE = "http://example.org/Attribute";
-    private static final String RELATIONSHIP_TYPE = "http://example.org/Relationship";
 
     public List<ClassSuggestion> classSuggestions(DocumentContext context, ClassSuggestionJobRequest request) {
         int count = Math.min(request.effectiveK(), 5);
@@ -37,7 +35,6 @@ public class SuggestionGenerator {
             String subject = classSubject(context, request.contextText(), index);
             suggestions.add(new ClassSuggestion(
                     "class_%03d".formatted(index),
-                    CLASS_TYPE,
                     LangString.en(subject),
                     LangString.en("A concept identified from the provided document context."),
                     LangString.en("Generated from the selected legal text and modeling context."),
@@ -89,9 +86,8 @@ public class SuggestionGenerator {
             String targetClassId = "related_class_%03d".formatted(index);
             suggestions.add(new RelationshipSuggestion(
                     "rel_%03d".formatted(index),
-                    RELATIONSHIP_TYPE,
-                    request.selectedClassId(),
-                    targetClassId,
+                    new IdReference(request.selectedClassId()),
+                    new IdReference(targetClassId),
                     LangString.en(relationshipName(index)),
                     LangString.en("A relationship involving class " + request.selectedClassId() + "."),
                     LangString.en("Suggested from co-occurring obligations, rights, or references in the text."),
