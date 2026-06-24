@@ -68,6 +68,7 @@ public class SuggestionGenerator {
             suggestions.add(new AttributeSuggestion(
                     "attr_%03d".formatted(index),
                     ATTRIBUTE_TYPE,
+                    request.selectedClassId(),
                     LangString.en(name),
                     LangString.en("A property of class " + request.selectedClassId() + "."),
                     LangString.en("Suggested from the selected passages and contextual model."),
@@ -89,11 +90,11 @@ public class SuggestionGenerator {
             suggestions.add(new RelationshipSuggestion(
                     "rel_%03d".formatted(index),
                     RELATIONSHIP_TYPE,
+                    request.selectedClassId(),
+                    targetClassId,
                     LangString.en(relationshipName(index)),
                     LangString.en("A relationship involving class " + request.selectedClassId() + "."),
                     LangString.en("Suggested from co-occurring obligations, rights, or references in the text."),
-                    true,
-                    List.of(new IdReference(request.selectedClassId()), new IdReference(targetClassId)),
                     legalAct,
                     occurrences(index, references),
                     references

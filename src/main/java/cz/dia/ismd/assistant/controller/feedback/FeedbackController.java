@@ -19,19 +19,19 @@ public class FeedbackController {
         this.feedbackService = feedbackService;
     }
 
-    @PostMapping("/accepted-suggestions")
+    @PostMapping("/accept-suggestion")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void accept(@Valid @RequestBody FeedbackRequest request) {
         feedbackService.record(request.jobId(), request.suggestionId(), FeedbackType.ACCEPTED);
     }
 
-    @PostMapping("/liked-suggestions")
+    @PostMapping("/like-suggestion")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void like(@Valid @RequestBody FeedbackRequest request) {
         feedbackService.record(request.jobId(), request.suggestionId(), FeedbackType.LIKED);
     }
 
-    @PostMapping("/disliked-suggestions")
+    @PostMapping("/dislike-suggestion")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void dislike(@Valid @RequestBody FeedbackRequest request) {
         feedbackService.record(request.jobId(), request.suggestionId(), FeedbackType.DISLIKED);

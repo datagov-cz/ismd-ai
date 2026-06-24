@@ -18,7 +18,7 @@ services:
       APP_LLM_MAX_TOKENS: ${APP_LLM_MAX_TOKENS:-1024}
       APP_LLM_TEMPERATURE: ${APP_LLM_TEMPERATURE:-0.2}
       APP_LLM_TIMEOUT: ${APP_LLM_TIMEOUT:-60s}
-      APP_FEEDBACK_DB_PATH: /data/feedback.sqlite
+      APP_DB_PATH: /data/db.sqlite
     volumes:
       - ./data:/data
     restart: unless-stopped

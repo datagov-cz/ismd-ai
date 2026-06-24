@@ -84,6 +84,37 @@ class SemanticModelingAssistantApplicationTests {
     }
 
     @Test
+    void startsAndCompletesLegalRelationshipSuggestionJob() throws Exception {
+        MvcResult start = mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/relationship-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "k": 2,
+                                  "selected_class_id": "class_001",
+                                  "structural_element_ids": ["§1", "§2"],
+                                  "context_text": "Property rights"
+                                }
+                                """))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.selected_class_id").value("class_001"))
+                .andExpect(jsonPath("$.status").value("in_progress"))
+                .andReturn();
+
+        UUID jobId = UUID.fromString(Json.read(start, "job_id"));
+        waitForAsyncJob();
+
+        mockMvc.perform(get("/legal-acts/2024/1/2024-01-01/relationship-suggestions-jobs/{jobId}", jobId)
+                        .with(oidcAuthentication()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.job_id").value(jobId.toString()))
+                .andExpect(jsonPath("$.selected_class_id").value("class_001"))
+                .andExpect(jsonPath("$.status").value("completed"))
+                .andExpect(jsonPath("$.new_relationship_suggestions", hasSize(2)))
+                .andExpect(jsonPath("$.new_relationship_suggestions[0].legal_act.official_number").value("1/2024"));
+    }
+
+    @Test
     void recordsFeedbackForExistingJob() throws Exception {
         MvcResult start = mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs")
                         .with(oidcAuthentication())

@@ -20,7 +20,7 @@ RUN mkdir -p /data && chown -R app:app /app /data
 
 USER app
 
-ENV APP_FEEDBACK_DB_PATH=/data/feedback.sqlite \
+ENV APP_DB_PATH=/data/db.sqlite \
     APP_LLM_ENABLED=false \
     APP_LLM_PROVIDER=OPENAI \
     APP_LLM_MODEL=gpt-4o-mini \

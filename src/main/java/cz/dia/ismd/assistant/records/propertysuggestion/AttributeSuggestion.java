@@ -10,6 +10,7 @@ import java.util.List;
 public record AttributeSuggestion(
         String id,
         String type,
+        String associatedClass,
         LangString name,
         LangString definition,
         LangString explanation,
