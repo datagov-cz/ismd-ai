@@ -80,6 +80,82 @@ class SemanticModelingAssistantApplicationTests {
     }
 
     @Test
+    void returnsSuggestionJobsForMultipleJobIds() throws Exception {
+        MvcResult firstClassStart = mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"k": 1}
+                                """))
+                .andExpect(status().isAccepted())
+                .andReturn();
+        MvcResult secondClassStart = mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"k": 1}
+                                """))
+                .andExpect(status().isAccepted())
+                .andReturn();
+        MvcResult propertyStart = mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/property-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "k": 1,
+                                  "selected_class_id": "class_001"
+                                }
+                                """))
+                .andExpect(status().isAccepted())
+                .andReturn();
+        MvcResult relationshipStart = mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/relationship-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "k": 1,
+                                  "selected_class_id": "class_001"
+                                }
+                                """))
+                .andExpect(status().isAccepted())
+                .andReturn();
+
+        UUID firstClassJobId = UUID.fromString(Json.read(firstClassStart, "job_id"));
+        UUID secondClassJobId = UUID.fromString(Json.read(secondClassStart, "job_id"));
+        UUID propertyJobId = UUID.fromString(Json.read(propertyStart, "job_id"));
+        UUID relationshipJobId = UUID.fromString(Json.read(relationshipStart, "job_id"));
+        waitForAsyncJob();
+
+        mockMvc.perform(get("/legal-acts/2024/1/2024-01-01/class-suggestions-jobs")
+                        .queryParam("jobIds", firstClassJobId.toString(), secondClassJobId.toString())
+                        .with(oidcAuthentication()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].job_id").value(firstClassJobId.toString()))
+                .andExpect(jsonPath("$[1].job_id").value(secondClassJobId.toString()))
+                .andExpect(jsonPath("$[0].new_suggestions", hasSize(1)))
+                .andExpect(jsonPath("$[1].new_suggestions", hasSize(1)));
+
+        mockMvc.perform(get("/legal-acts/2024/1/2024-01-01/property-suggestions-jobs")
+                        .queryParam("jobIds", propertyJobId.toString())
+                        .with(oidcAuthentication()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].job_id").value(propertyJobId.toString()))
+                .andExpect(jsonPath("$[0].selected_class_id").value("class_001"))
+                .andExpect(jsonPath("$[0].new_attribute_suggestions", hasSize(1)));
+
+        mockMvc.perform(get("/legal-acts/2024/1/2024-01-01/relationship-suggestions-jobs")
+                        .queryParam("jobIds", relationshipJobId.toString())
+                        .with(oidcAuthentication()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].job_id").value(relationshipJobId.toString()))
+                .andExpect(jsonPath("$[0].selected_class_id").value("class_001"))
+                .andExpect(jsonPath("$[0].new_relationship_suggestions", hasSize(1)));
+    }
+
+    @Test
     void acceptsYearMonthDayLegalActDateFormat() throws Exception {
         mockMvc.perform(post("/legal-acts/2026/1/2026-01-01/class-suggestions-top-k-extraction-jobs")
                         .with(oidcAuthentication())
@@ -171,8 +247,8 @@ class SemanticModelingAssistantApplicationTests {
     }
 
     @Test
-    void recordsFeedbackForExistingJob() throws Exception {
-        MvcResult start = mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs")
+    void recordsFeedbackForExistingJobs() throws Exception {
+        MvcResult firstStart = mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs")
                         .with(oidcAuthentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -181,29 +257,51 @@ class SemanticModelingAssistantApplicationTests {
                 .andExpect(status().isAccepted())
                 .andReturn();
 
-        UUID jobId = UUID.fromString(Json.read(start, "job_id"));
+        MvcResult secondStart = mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"k": 1}
+                                """))
+                .andExpect(status().isAccepted())
+                .andReturn();
+
+        UUID firstJobId = UUID.fromString(Json.read(firstStart, "job_id"));
+        UUID secondJobId = UUID.fromString(Json.read(secondStart, "job_id"));
 
         mockMvc.perform(post("/like-suggestion")
                         .with(oidcAuthentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {
-                                  "job_id": "%s",
-                                  "suggestion_id": "class_001"
-                                }
-                                """.formatted(jobId)))
+                                [
+                                  {
+                                    "jobID": "%s",
+                                    "suggestionID": "class_001"
+                                  },
+                                  {
+                                    "jobID": "%s",
+                                    "suggestionID": "class_002"
+                                  }
+                                ]
+                                """.formatted(firstJobId, secondJobId)))
                 .andExpect(status().isNoContent());
 
         Integer records = jdbcTemplate.queryForObject("""
                         SELECT COUNT(*)
                         FROM feedback_records
-                        WHERE job_id = ? AND suggestion_id = ? AND feedback_type = ?
+                        WHERE feedback_type = ?
+                          AND (
+                            (job_id = ? AND suggestion_id = ?)
+                            OR (job_id = ? AND suggestion_id = ?)
+                          )
                         """,
                 Integer.class,
-                jobId.toString(),
+                "LIKED",
+                firstJobId.toString(),
                 "class_001",
-                "LIKED");
-        org.assertj.core.api.Assertions.assertThat(records).isEqualTo(1);
+                secondJobId.toString(),
+                "class_002");
+        org.assertj.core.api.Assertions.assertThat(records).isEqualTo(2);
     }
 
     @Test
@@ -230,10 +328,12 @@ class SemanticModelingAssistantApplicationTests {
                                         .with(oidcAuthentication())
                                         .contentType(MediaType.APPLICATION_JSON)
                                         .content("""
-                                                {
-                                                  "job_id": "%s",
-                                                  "suggestion_id": "class_%03d"
-                                                }
+                                                [
+                                                  {
+                                                    "job_id": "%s",
+                                                    "suggestion_id": "class_%03d"
+                                                  }
+                                                ]
                                                 """.formatted(jobId, index)))
                                 .andExpect(status().isNoContent());
                         return null;

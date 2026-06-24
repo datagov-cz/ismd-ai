@@ -15,10 +15,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -40,7 +42,7 @@ public class RelationshipSuggestionController {
             @Valid @RequestBody PropertySuggestionJobRequest request
     ) {
         SuggestionJob job = suggestionJobService.startRelationshipJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
-        return new SelectedClassJobStartResponse(job.jobId(), job.status());
+        return new SelectedClassJobStartResponse(job.jobId(), job.selectedClassId(), job.status());
     }
 
     @GetMapping("/legal-acts/relationship-suggestions-jobs/{jobId}")
@@ -48,8 +50,22 @@ public class RelationshipSuggestionController {
             @PathVariable UUID jobId
     ) {
         SuggestionJob job = suggestionJobService.get(jobId);
+        return toResponse(job);
+    }
+
+    @GetMapping("/legal-acts/relationship-suggestions-jobs")
+    public List<RelationshipSuggestionsJobResponse> getRelationshipSuggestions(
+            @RequestParam List<UUID> jobIds
+    ) {
+        return suggestionJobService.getAll(jobIds).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private RelationshipSuggestionsJobResponse toResponse(SuggestionJob job) {
         return new RelationshipSuggestionsJobResponse(
                 job.jobId(),
+                job.selectedClassId(),
                 job.status(),
                 job.relationshipSuggestions()
         );

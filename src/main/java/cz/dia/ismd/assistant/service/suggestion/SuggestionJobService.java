@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -76,6 +77,12 @@ public class SuggestionJobService {
             throw new JobNotFoundException(jobId);
         }
         return job;
+    }
+
+    public List<SuggestionJob> getAll(List<UUID> jobIds) {
+        return jobIds.stream()
+                .map(this::get)
+                .toList();
     }
 
     public void ensureExists(UUID jobId) {

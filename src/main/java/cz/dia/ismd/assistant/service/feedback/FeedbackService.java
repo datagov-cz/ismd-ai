@@ -32,16 +32,32 @@ public class FeedbackService {
     }
 
     public void record(FeedbackRecord record) {
-        suggestionJobService.ensureExists(record.jobId());
+        record(List.of(record));
+    }
+
+    public void record(List<FeedbackRecord> records) {
+        if (records.isEmpty()) {
+            return;
+        }
+
+        records.stream()
+                .map(FeedbackRecord::jobId)
+                .distinct()
+                .forEach(suggestionJobService::ensureExists);
+
         synchronized (writeMonitor) {
-            jdbcTemplate.update("""
+            jdbcTemplate.batchUpdate("""
                             INSERT INTO feedback_records(job_id, suggestion_id, feedback_type, created_at)
                             VALUES (?, ?, ?, ?)
                             """,
-                    record.jobId().toString(),
-                    record.suggestionId(),
-                    record.type().name(),
-                    record.createdAt().toString());
+                    records,
+                    records.size(),
+                    (statement, record) -> {
+                        statement.setString(1, record.jobId().toString());
+                        statement.setString(2, record.suggestionId());
+                        statement.setString(3, record.type().name());
+                        statement.setString(4, record.createdAt().toString());
+                    });
         }
     }
 

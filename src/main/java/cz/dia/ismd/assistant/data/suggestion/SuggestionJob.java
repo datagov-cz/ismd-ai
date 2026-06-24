@@ -13,6 +13,7 @@ public class SuggestionJob {
 
     private final UUID jobId;
     private final JobKind kind;
+    private final String selectedClassId;
     private final Instant createdAt;
     private volatile JobStatus status;
     private volatile List<ClassSuggestion> classSuggestions;
@@ -22,6 +23,7 @@ public class SuggestionJob {
     public SuggestionJob(UUID jobId, JobKind kind, String selectedClassId) {
         this.jobId = jobId;
         this.kind = kind;
+        this.selectedClassId = selectedClassId;
         this.createdAt = Instant.now();
         this.status = JobStatus.IN_PROGRESS;
         this.classSuggestions = List.of();
@@ -35,6 +37,10 @@ public class SuggestionJob {
 
     public JobKind kind() {
         return kind;
+    }
+
+    public String selectedClassId() {
+        return selectedClassId;
     }
 
     public Instant createdAt() {

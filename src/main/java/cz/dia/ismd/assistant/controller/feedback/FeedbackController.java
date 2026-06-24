@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 public class FeedbackController {
 
@@ -21,19 +23,25 @@ public class FeedbackController {
 
     @PostMapping("/accept-suggestion")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void accept(@Valid @RequestBody FeedbackRequest request) {
-        feedbackService.record(request.jobId(), request.suggestionId(), FeedbackType.ACCEPTED);
+    public void accept(@Valid @RequestBody List<@Valid FeedbackRequest> requests) {
+        record(requests, FeedbackType.ACCEPTED);
     }
 
     @PostMapping("/like-suggestion")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void like(@Valid @RequestBody FeedbackRequest request) {
-        feedbackService.record(request.jobId(), request.suggestionId(), FeedbackType.LIKED);
+    public void like(@Valid @RequestBody List<@Valid FeedbackRequest> requests) {
+        record(requests, FeedbackType.LIKED);
     }
 
     @PostMapping("/dislike-suggestion")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void dislike(@Valid @RequestBody FeedbackRequest request) {
-        feedbackService.record(request.jobId(), request.suggestionId(), FeedbackType.DISLIKED);
+    public void dislike(@Valid @RequestBody List<@Valid FeedbackRequest> requests) {
+        record(requests, FeedbackType.DISLIKED);
+    }
+
+    private void record(List<FeedbackRequest> requests, FeedbackType type) {
+        feedbackService.record(requests.stream()
+                .map(request -> request.toRecord(type))
+                .toList());
     }
 }
