@@ -8,7 +8,6 @@ import java.util.UUID;
 
 public record PropertySuggestionsJobResponse(
         UUID jobId,
-        String selectedClassId,
         JobStatus status,
         List<AttributeSuggestion> newAttributeSuggestions
 ) {

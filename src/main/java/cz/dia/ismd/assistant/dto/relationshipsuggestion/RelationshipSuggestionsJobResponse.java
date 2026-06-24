@@ -8,7 +8,6 @@ import java.util.UUID;
 
 public record RelationshipSuggestionsJobResponse(
         UUID jobId,
-        String selectedClassId,
         JobStatus status,
         List<RelationshipSuggestion> newRelationshipSuggestions
 ) {

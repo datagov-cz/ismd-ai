@@ -40,7 +40,7 @@ public class PropertySuggestionController {
             @Valid @RequestBody PropertySuggestionJobRequest request
     ) {
         SuggestionJob job = suggestionJobService.startPropertyJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
-        return new SelectedClassJobStartResponse(job.jobId(), job.selectedClassId(), job.status());
+        return new SelectedClassJobStartResponse(job.jobId(), job.status());
     }
 
     @GetMapping("/legal-acts/property-suggestions-jobs/{jobId}")
@@ -50,7 +50,6 @@ public class PropertySuggestionController {
         SuggestionJob job = suggestionJobService.get(jobId);
         return new PropertySuggestionsJobResponse(
                 job.jobId(),
-                job.selectedClassId(),
                 job.status(),
                 job.attributeSuggestions()
         );

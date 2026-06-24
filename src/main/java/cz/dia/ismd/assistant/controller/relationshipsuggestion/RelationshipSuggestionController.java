@@ -40,7 +40,7 @@ public class RelationshipSuggestionController {
             @Valid @RequestBody PropertySuggestionJobRequest request
     ) {
         SuggestionJob job = suggestionJobService.startRelationshipJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
-        return new SelectedClassJobStartResponse(job.jobId(), job.selectedClassId(), job.status());
+        return new SelectedClassJobStartResponse(job.jobId(), job.status());
     }
 
     @GetMapping("/legal-acts/relationship-suggestions-jobs/{jobId}")
@@ -50,7 +50,6 @@ public class RelationshipSuggestionController {
         SuggestionJob job = suggestionJobService.get(jobId);
         return new RelationshipSuggestionsJobResponse(
                 job.jobId(),
-                job.selectedClassId(),
                 job.status(),
                 job.relationshipSuggestions()
         );
