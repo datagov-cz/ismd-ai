@@ -16,11 +16,15 @@ RUN groupadd --system app && useradd --system --gid app app
 
 COPY --from=build /workspace/target/*.jar app.jar
 
-RUN mkdir -p /data && chown -R app:app /app /data
+RUN chown -R app:app /app
 
 USER app
 
-ENV APP_DB_PATH=/data/db.sqlite \
+ENV APP_DB_HOST=postgres \
+    APP_DB_PORT=5432 \
+    APP_DB_NAME=ismd \
+    APP_DB_USER=ismd \
+    APP_DB_PASSWORD=ismd \
     APP_LLM_ENABLED=false \
     APP_LLM_PROVIDER=OPENAI \
     APP_LLM_MODEL=gpt-4o-mini \

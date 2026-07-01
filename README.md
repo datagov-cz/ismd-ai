@@ -26,6 +26,11 @@ Configure the OIDC issuer and JWK set URL with environment variables or properti
 OIDC_ISSUER_URI=https://issuer.example.com/realms/ismd
 OIDC_JWK_SET_URI=https://issuer.example.com/realms/ismd/protocol/openid-connect/certs
 APP_TOKENS_MAX_ALLOWED_PER_DAY=100000
+APP_DB_HOST=localhost
+APP_DB_PORT=5432
+APP_DB_NAME=ismd
+APP_DB_USER=ismd
+APP_DB_PASSWORD=ismd
 ```
 
 ## LLM Configuration

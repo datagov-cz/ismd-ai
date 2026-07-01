@@ -1,0 +1,121 @@
+package cz.dia.ismd.assistant.controller.classsuggestion;
+
+import cz.dia.ismd.assistant.controller.OpenApiExamples;
+import cz.dia.ismd.assistant.dto.classsuggestion.ClassSuggestionJobRequest;
+import cz.dia.ismd.assistant.dto.classsuggestion.ClassSuggestionsJobResponse;
+import cz.dia.ismd.assistant.dto.classsuggestion.JobStartResponse;
+import cz.dia.ismd.assistant.records.exception.ErrorResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import org.springframework.security.oauth2.jwt.Jwt;
+
+import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
+
+public interface ClassSuggestionApi {
+
+    @Operation(
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    content = @Content(
+                            schema = @Schema(implementation = ClassSuggestionJobRequest.class),
+                            examples = @ExampleObject(
+                                    name = "Class suggestion job request",
+                                    value = OpenApiExamples.CLASS_SUGGESTION_REQUEST
+                            )
+                    )
+            ),
+            responses = {
+                    @ApiResponse(
+                            responseCode = "202",
+                            description = "Class suggestion job accepted.",
+                            content = @Content(
+                                    schema = @Schema(implementation = JobStartResponse.class),
+                                    examples = @ExampleObject(
+                                            name = "Started class suggestion job",
+                                            value = OpenApiExamples.CLASS_SUGGESTION_START_RESPONSE
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "422",
+                            description = "Invalid request data.",
+                            content = @Content(
+                                    schema = @Schema(implementation = ErrorResponse.class),
+                                    examples = @ExampleObject(
+                                            name = "Validation error",
+                                            value = OpenApiExamples.VALIDATION_ERROR_RESPONSE
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "429",
+                            description = "Token limit reached.",
+                            content = @Content(
+                                    schema = @Schema(implementation = ErrorResponse.class),
+                                    examples = @ExampleObject(
+                                            name = "Token limit error",
+                                            value = OpenApiExamples.TOKEN_LIMIT_ERROR_RESPONSE
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "502",
+                            description = "LLM provider error.",
+                            content = @Content(
+                                    schema = @Schema(implementation = ErrorResponse.class),
+                                    examples = @ExampleObject(
+                                            name = "LLM error",
+                                            value = OpenApiExamples.LLM_ERROR_RESPONSE
+                                    )
+                            )
+                    )
+            }
+    )
+    JobStartResponse startClassSuggestions(
+            @Parameter(example = "2024") int year,
+            @Parameter(example = "1") int number,
+            @Parameter(example = "2024-01-15") LocalDate date,
+            Jwt jwt,
+            ClassSuggestionJobRequest request
+    );
+
+    @Operation(
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Class suggestion jobs.",
+                            content = @Content(
+                                    array = @ArraySchema(schema = @Schema(implementation = ClassSuggestionsJobResponse.class)),
+                                    examples = @ExampleObject(
+                                            name = "Class suggestion job result",
+                                            value = OpenApiExamples.CLASS_SUGGESTIONS_RESPONSE
+                                    )
+                            )
+                    ),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "One of the requested jobs was not found.",
+                            content = @Content(
+                                    schema = @Schema(implementation = ErrorResponse.class),
+                                    examples = @ExampleObject(
+                                            name = "Job not found",
+                                            value = OpenApiExamples.JOB_NOT_FOUND_ERROR_RESPONSE
+                                    )
+                            )
+                    )
+            }
+    )
+    List<ClassSuggestionsJobResponse> getClassSuggestions(
+            @Parameter(
+                    description = "Job identifiers to retrieve.",
+                    example = OpenApiExamples.JOB_ID
+            )
+            List<UUID> jobIds
+    );
+}

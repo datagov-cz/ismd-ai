@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-public class FeedbackController {
+public class FeedbackController implements FeedbackApi {
 
     private final FeedbackService feedbackService;
     private final ApiEnvironment apiEnvironment;
@@ -31,6 +31,7 @@ public class FeedbackController {
     }
 
     @PostMapping("/accept-suggestion")
+    @Override
     public ResponseEntity<?> accept(@Valid @RequestBody List<@Valid FeedbackRequest> requests) {
         if (apiEnvironment.isDevelopment()) {
             return ResponseEntity.ok(developmentApiResponses.acceptFeedback());
@@ -40,6 +41,7 @@ public class FeedbackController {
     }
 
     @PostMapping("/like-suggestion")
+    @Override
     public ResponseEntity<?> like(@Valid @RequestBody List<@Valid FeedbackRequest> requests) {
         if (apiEnvironment.isDevelopment()) {
             return ResponseEntity.ok(developmentApiResponses.likeFeedback());
@@ -49,6 +51,7 @@ public class FeedbackController {
     }
 
     @PostMapping("/dislike-suggestion")
+    @Override
     public ResponseEntity<?> dislike(@Valid @RequestBody List<@Valid FeedbackRequest> requests) {
         if (apiEnvironment.isDevelopment()) {
             return ResponseEntity.ok(developmentApiResponses.dislikeFeedback());

@@ -16,6 +16,7 @@ import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class FeedbackIntegrationTests extends AssistantIntegrationTest {
@@ -35,13 +36,14 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
                         .with(oidcAuthentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"k": 1}
+                                {"k": 3}
                                 """))
                 .andExpect(status().isAccepted())
                 .andReturn();
 
         UUID firstJobId = UUID.fromString(Json.read(firstStart, "job_id"));
         UUID secondJobId = UUID.fromString(Json.read(secondStart, "job_id"));
+        waitForAsyncJob();
 
         mockMvc.perform(post("/like-suggestion")
                         .with(oidcAuthentication())
@@ -72,11 +74,11 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
                         """,
                 Integer.class,
                 "LIKED",
-                firstJobId.toString(),
+                firstJobId,
                 "class_001",
-                secondJobId.toString(),
+                secondJobId,
                 "class_002",
-                secondJobId.toString(),
+                secondJobId,
                 "class_003");
         assertThat(records).isEqualTo(3);
     }
@@ -93,6 +95,7 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
                 .andReturn();
 
         UUID jobId = UUID.fromString(Json.read(start, "job_id"));
+        waitForAsyncJob();
         int writeCount = 20;
         CountDownLatch startGate = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(8);
@@ -108,10 +111,10 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
                                                 [
                                                   {
                                                     "jobID": "%s",
-                                                    "suggestionID": ["class_%03d"]
+                                                    "suggestionID": ["class_001"]
                                                   }
                                                 ]
-                                                """.formatted(jobId, index)))
+                                                """.formatted(jobId)))
                                 .andExpect(status().isNoContent());
                         return null;
                     }))
@@ -129,9 +132,57 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
                         SELECT COUNT(*)
                         FROM feedback_records
                         WHERE job_id = ?
-                        """,
+                """,
                 Integer.class,
-                jobId.toString());
+                jobId);
         assertThat(records).isEqualTo(writeCount);
+    }
+
+    @Test
+    void returnsNotFoundWhenFeedbackReferencesMissingJob() throws Exception {
+        UUID missingJobId = UUID.fromString("00000000-0000-0000-0000-000000009999");
+
+        mockMvc.perform(post("/like-suggestion")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                [
+                                  {
+                                    "jobID": "%s",
+                                    "suggestionID": ["class_001"]
+                                  }
+                                ]
+                                """.formatted(missingJobId)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Job not found: " + missingJobId));
+    }
+
+    @Test
+    void returnsNotFoundWhenFeedbackReferencesMissingSuggestion() throws Exception {
+        MvcResult start = mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"k": 1}
+                                """))
+                .andExpect(status().isAccepted())
+                .andReturn();
+
+        UUID jobId = UUID.fromString(Json.read(start, "job_id"));
+        waitForAsyncJob();
+
+        mockMvc.perform(post("/like-suggestion")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                [
+                                  {
+                                    "jobID": "%s",
+                                    "suggestionID": ["missing-suggestion-id"]
+                                  }
+                                ]
+                                """.formatted(jobId)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.detail").value("Suggestion not found for job " + jobId + ": missing-suggestion-id"));
     }
 }

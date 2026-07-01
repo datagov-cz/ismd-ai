@@ -26,7 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-public class PropertySuggestionController {
+public class PropertySuggestionController implements PropertySuggestionApi {
 
     private final SuggestionJobService suggestionJobService;
     private final ApiEnvironment apiEnvironment;
@@ -44,6 +44,7 @@ public class PropertySuggestionController {
 
     @PostMapping("/legal-acts/{year}/{number}/{date}/property-suggestions-top-k-extraction-jobs")
     @ResponseStatus(HttpStatus.ACCEPTED)
+    @Override
     public SelectedClassJobStartResponse startPropertySuggestions(
             @PathVariable int year,
             @PathVariable int number,
@@ -59,6 +60,7 @@ public class PropertySuggestionController {
     }
 
     @GetMapping("/legal-acts/property-suggestions-jobs")
+    @Override
     public List<PropertySuggestionsJobResponse> getPropertySuggestions(
             @RequestParam List<UUID> jobIds
     ) {

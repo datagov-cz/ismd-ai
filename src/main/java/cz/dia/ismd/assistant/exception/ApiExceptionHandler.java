@@ -16,6 +16,11 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(exception.getMessage()));
     }
 
+    @ExceptionHandler(SuggestionNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleSuggestionNotFound(SuggestionNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ErrorResponse(exception.getMessage()));
+    }
+
     @ExceptionHandler(TokenLimitReachedException.class)
     public ResponseEntity<ErrorResponse> handleTokenLimitReached(TokenLimitReachedException exception) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(new ErrorResponse(exception.getMessage()));

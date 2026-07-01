@@ -18,7 +18,32 @@ services:
       APP_LLM_MAX_TOKENS: ${APP_LLM_MAX_TOKENS:-1024}
       APP_LLM_TEMPERATURE: ${APP_LLM_TEMPERATURE:-0.2}
       APP_LLM_TIMEOUT: ${APP_LLM_TIMEOUT:-60s}
-      APP_DB_PATH: /data/db.sqlite
-    volumes:
-      - ./data:/data
+      APP_DB_HOST: postgres
+      APP_DB_PORT: 5432
+      APP_DB_NAME: ${APP_DB_NAME:-ismd}
+      APP_DB_USER: ${APP_DB_USER:-ismd}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-ismd}
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${APP_DB_NAME:-ismd}
+      POSTGRES_USER: ${APP_DB_USER:-ismd}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:-ismd}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
