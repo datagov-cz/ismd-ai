@@ -5,7 +5,6 @@ import cz.dia.ismd.assistant.domain.TermType;
 import cz.dia.ismd.assistant.dto.classsuggestion.ClassSuggestionsJobResponse;
 import cz.dia.ismd.assistant.dto.classsuggestion.JobStartResponse;
 import cz.dia.ismd.assistant.dto.propertysuggestion.PropertySuggestionsJobResponse;
-import cz.dia.ismd.assistant.dto.propertysuggestion.SelectedClassJobStartResponse;
 import cz.dia.ismd.assistant.dto.relationshipsuggestion.RelationshipSuggestionsJobResponse;
 import cz.dia.ismd.assistant.records.classsuggestion.ClassSuggestion;
 import cz.dia.ismd.assistant.records.propertysuggestion.AttributeSuggestion;
@@ -58,8 +57,8 @@ public class DevelopmentApiResponses {
         ));
     }
 
-    public SelectedClassJobStartResponse startPropertySuggestions() {
-        return new SelectedClassJobStartResponse(PROPERTY_JOB_ID, CLASS_ID, JobStatus.IN_PROGRESS);
+    public JobStartResponse startPropertySuggestions() {
+        return new JobStartResponse(PROPERTY_JOB_ID, JobStatus.IN_PROGRESS);
     }
 
     public List<PropertySuggestionsJobResponse> propertySuggestions() {
@@ -78,8 +77,8 @@ public class DevelopmentApiResponses {
         ));
     }
 
-    public SelectedClassJobStartResponse startRelationshipSuggestions() {
-        return new SelectedClassJobStartResponse(RELATIONSHIP_JOB_ID, CLASS_ID, JobStatus.IN_PROGRESS);
+    public JobStartResponse startRelationshipSuggestions() {
+        return new JobStartResponse(RELATIONSHIP_JOB_ID, JobStatus.IN_PROGRESS);
     }
 
     public List<RelationshipSuggestionsJobResponse> relationshipSuggestions() {

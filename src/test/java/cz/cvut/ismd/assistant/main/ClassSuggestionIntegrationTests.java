@@ -27,7 +27,7 @@ class ClassSuggestionIntegrationTests extends AssistantIntegrationTest {
                                   "known_conceptual_model": {
                                     "classes": [
                                       {
-                                        "suggestion_id": "known-class-001",
+                                        "termID": "known-class-001",
                                         "name": {"cs": "český string", "en": "english string", "fr": "francois"},
                                         "definition": {"en": "Known definition"},
                                         "explanation": {"en": "Known explanation"},

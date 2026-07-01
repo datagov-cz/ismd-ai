@@ -1,7 +1,7 @@
 package cz.dia.ismd.assistant.controller.relationshipsuggestion;
 
 import cz.dia.ismd.assistant.data.suggestion.SuggestionJob;
-import cz.dia.ismd.assistant.dto.propertysuggestion.SelectedClassJobStartResponse;
+import cz.dia.ismd.assistant.dto.classsuggestion.JobStartResponse;
 import cz.dia.ismd.assistant.dto.relationshipsuggestion.RelationshipSuggestionJobRequest;
 import cz.dia.ismd.assistant.dto.relationshipsuggestion.RelationshipSuggestionsJobResponse;
 import cz.dia.ismd.assistant.records.suggestion.DocumentContext;
@@ -45,7 +45,7 @@ public class RelationshipSuggestionController implements RelationshipSuggestionA
     @PostMapping("/legal-acts/{year}/{number}/{date}/relationship-suggestions-top-k-extraction-jobs")
     @ResponseStatus(HttpStatus.ACCEPTED)
     @Override
-    public SelectedClassJobStartResponse startRelationshipSuggestions(
+    public JobStartResponse startRelationshipSuggestions(
             @PathVariable int year,
             @PathVariable int number,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
@@ -56,7 +56,7 @@ public class RelationshipSuggestionController implements RelationshipSuggestionA
             return developmentApiResponses.startRelationshipSuggestions();
         }
         SuggestionJob job = suggestionJobService.startRelationshipJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
-        return new SelectedClassJobStartResponse(job.jobId(), job.selectedClassId(), job.status());
+        return new JobStartResponse(job.jobId(), job.status());
     }
 
     @GetMapping("/legal-acts/relationship-suggestions-jobs")

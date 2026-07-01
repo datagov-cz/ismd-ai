@@ -1,7 +1,7 @@
 package cz.dia.ismd.assistant.controller.relationshipsuggestion;
 
 import cz.dia.ismd.assistant.controller.OpenApiExamples;
-import cz.dia.ismd.assistant.dto.propertysuggestion.SelectedClassJobStartResponse;
+import cz.dia.ismd.assistant.dto.classsuggestion.JobStartResponse;
 import cz.dia.ismd.assistant.dto.relationshipsuggestion.RelationshipSuggestionJobRequest;
 import cz.dia.ismd.assistant.dto.relationshipsuggestion.RelationshipSuggestionsJobResponse;
 import cz.dia.ismd.assistant.records.exception.ErrorResponse;
@@ -35,7 +35,7 @@ public interface RelationshipSuggestionApi {
                             responseCode = "202",
                             description = "Relationship suggestion job accepted.",
                             content = @Content(
-                                    schema = @Schema(implementation = SelectedClassJobStartResponse.class),
+                                    schema = @Schema(implementation = JobStartResponse.class),
                                     examples = @ExampleObject(
                                             name = "Started relationship suggestion job",
                                             value = OpenApiExamples.RELATIONSHIP_JOB_START_RESPONSE
@@ -77,7 +77,7 @@ public interface RelationshipSuggestionApi {
                     )
             }
     )
-    SelectedClassJobStartResponse startRelationshipSuggestions(
+    JobStartResponse startRelationshipSuggestions(
             @Parameter(example = "2024") int year,
             @Parameter(example = "1") int number,
             @Parameter(example = "2024-01-15") LocalDate date,

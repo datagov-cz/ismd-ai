@@ -26,6 +26,8 @@ class PropertySuggestionIntegrationTests extends AssistantIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.selected_class_id").doesNotExist())
+                .andExpect(jsonPath("$.status").value("in_progress"))
                 .andReturn();
 
         UUID jobId = UUID.fromString(Json.read(start, "job_id"));

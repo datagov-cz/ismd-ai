@@ -1,9 +1,9 @@
 package cz.dia.ismd.assistant.controller.propertysuggestion;
 
 import cz.dia.ismd.assistant.controller.OpenApiExamples;
+import cz.dia.ismd.assistant.dto.classsuggestion.JobStartResponse;
 import cz.dia.ismd.assistant.dto.propertysuggestion.PropertySuggestionJobRequest;
 import cz.dia.ismd.assistant.dto.propertysuggestion.PropertySuggestionsJobResponse;
-import cz.dia.ismd.assistant.dto.propertysuggestion.SelectedClassJobStartResponse;
 import cz.dia.ismd.assistant.records.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -35,7 +35,7 @@ public interface PropertySuggestionApi {
                             responseCode = "202",
                             description = "Property suggestion job accepted.",
                             content = @Content(
-                                    schema = @Schema(implementation = SelectedClassJobStartResponse.class),
+                                    schema = @Schema(implementation = JobStartResponse.class),
                                     examples = @ExampleObject(
                                             name = "Started property suggestion job",
                                             value = OpenApiExamples.SELECTED_CLASS_JOB_START_RESPONSE
@@ -77,7 +77,7 @@ public interface PropertySuggestionApi {
                     )
             }
     )
-    SelectedClassJobStartResponse startPropertySuggestions(
+    JobStartResponse startPropertySuggestions(
             @Parameter(example = "2024") int year,
             @Parameter(example = "1") int number,
             @Parameter(example = "2024-01-15") LocalDate date,

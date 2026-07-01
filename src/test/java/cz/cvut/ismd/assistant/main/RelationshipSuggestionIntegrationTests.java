@@ -28,7 +28,7 @@ class RelationshipSuggestionIntegrationTests extends AssistantIntegrationTest {
                                 }
                                 """))
                 .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.selected_class_id").value("class_001"))
+                .andExpect(jsonPath("$.selected_class_id").doesNotExist())
                 .andExpect(jsonPath("$.status").value("in_progress"))
                 .andReturn();
 

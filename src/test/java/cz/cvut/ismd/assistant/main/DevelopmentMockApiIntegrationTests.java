@@ -51,7 +51,8 @@ class DevelopmentMockApiIntegrationTests extends AssistantIntegrationTest {
                                 """))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.job_id").value("00000000-0000-0000-0000-000000000201"))
-                .andExpect(jsonPath("$.selected_class_id").value("mock-class-001"));
+                .andExpect(jsonPath("$.selected_class_id").doesNotExist())
+                .andExpect(jsonPath("$.status").value("in_progress"));
 
         mockMvc.perform(get("/legal-acts/property-suggestions-jobs")
                         .queryParam("jobIds", "11111111-1111-1111-1111-111111111111")
@@ -75,7 +76,8 @@ class DevelopmentMockApiIntegrationTests extends AssistantIntegrationTest {
                                 """))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.job_id").value("00000000-0000-0000-0000-000000000301"))
-                .andExpect(jsonPath("$.selected_class_id").value("mock-class-001"));
+                .andExpect(jsonPath("$.selected_class_id").doesNotExist())
+                .andExpect(jsonPath("$.status").value("in_progress"));
 
         mockMvc.perform(get("/legal-acts/relationship-suggestions-jobs")
                         .queryParam("jobIds", "11111111-1111-1111-1111-111111111111")

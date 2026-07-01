@@ -1,8 +1,8 @@
 package cz.dia.ismd.assistant.controller.propertysuggestion;
 
+import cz.dia.ismd.assistant.dto.classsuggestion.JobStartResponse;
 import cz.dia.ismd.assistant.dto.propertysuggestion.PropertySuggestionJobRequest;
 import cz.dia.ismd.assistant.dto.propertysuggestion.PropertySuggestionsJobResponse;
-import cz.dia.ismd.assistant.dto.propertysuggestion.SelectedClassJobStartResponse;
 import cz.dia.ismd.assistant.data.suggestion.SuggestionJob;
 import cz.dia.ismd.assistant.records.suggestion.DocumentContext;
 import cz.dia.ismd.assistant.service.environment.ApiEnvironment;
@@ -45,7 +45,7 @@ public class PropertySuggestionController implements PropertySuggestionApi {
     @PostMapping("/legal-acts/{year}/{number}/{date}/property-suggestions-top-k-extraction-jobs")
     @ResponseStatus(HttpStatus.ACCEPTED)
     @Override
-    public SelectedClassJobStartResponse startPropertySuggestions(
+    public JobStartResponse startPropertySuggestions(
             @PathVariable int year,
             @PathVariable int number,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
@@ -56,7 +56,7 @@ public class PropertySuggestionController implements PropertySuggestionApi {
             return developmentApiResponses.startPropertySuggestions();
         }
         SuggestionJob job = suggestionJobService.startPropertyJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
-        return new SelectedClassJobStartResponse(job.jobId(), job.selectedClassId(), job.status());
+        return new JobStartResponse(job.jobId(), job.status());
     }
 
     @GetMapping("/legal-acts/property-suggestions-jobs")

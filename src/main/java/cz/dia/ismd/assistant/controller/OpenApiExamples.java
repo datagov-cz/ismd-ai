@@ -17,7 +17,7 @@ public final class OpenApiExamples {
               "knownConceptualModel": {
                 "classes": [
                   {
-                    "suggestionID": "existing-class-applicant",
+                    "termID": "https://slovník.gov.cz/example",
                     "name": {
                       "cs": "Žadatel"
                     },
@@ -74,7 +74,7 @@ public final class OpenApiExamples {
     public static final String PROPERTY_SUGGESTION_REQUEST = """
             {
               "k": 3,
-              "selectedClassId": "class-permit-application",
+              "selectedClassId": "https://slovník.gov.cz/example",
               "structuralElementIds": [
                 "/eli/cz/sb/2024/1/par_2"
               ],
@@ -82,7 +82,7 @@ public final class OpenApiExamples {
               "knownConceptualModel": {
                 "classes": [
                   {
-                    "suggestionID": "class-permit-application",
+                    "termID": "https://slovník.gov.cz/example",
                     "name": {
                       "cs": "Žádost o povolení"
                     },
@@ -106,7 +106,6 @@ public final class OpenApiExamples {
     public static final String SELECTED_CLASS_JOB_START_RESPONSE = """
             {
               "jobId": "00000000-0000-0000-0000-000000000201",
-              "selectedClassId": "class-permit-application",
               "status": "IN_PROGRESS"
             }
             """;
@@ -115,7 +114,7 @@ public final class OpenApiExamples {
             [
               {
                 "jobId": "00000000-0000-0000-0000-000000000201",
-                "selectedClassId": "00000000-0000-0000-0000-000000000203",
+                "selectedClassId": "https://slovník.gov.cz/example",
                 "status": "COMPLETED",
                 "newAttributeSuggestions": [
                   {
@@ -142,7 +141,7 @@ public final class OpenApiExamples {
     public static final String RELATIONSHIP_SUGGESTION_REQUEST = """
             {
               "k": 3,
-              "selectedClassId": "class-permit-application",
+              "selectedClassId": "00000000-0000-0000-0000-000000000204",
               "structuralElementIds": [
                 "/eli/cz/sb/2024/1/par_4"
               ],
@@ -150,7 +149,7 @@ public final class OpenApiExamples {
               "knownConceptualModel": {
                 "classes": [
                   {
-                    "suggestionID": "class-permit-application",
+                    "termID": "https://slovník.gov.cz/example",
                     "name": {
                       "cs": "Žádost o povolení"
                     },
@@ -165,7 +164,7 @@ public final class OpenApiExamples {
                     "legalAct": "/eli/cz/sb/2024/1"
                   },
                   {
-                    "suggestionID": "class-competent-authority",
+                    "termID": "https://slovník.gov.cz/example",
                     "name": {
                       "cs": "Příslušný orgán"
                     },
@@ -189,7 +188,6 @@ public final class OpenApiExamples {
     public static final String RELATIONSHIP_JOB_START_RESPONSE = """
             {
               "jobId": "00000000-0000-0000-0000-000000000301",
-              "selectedClassId": "class-permit-application",
               "status": "IN_PROGRESS"
             }
             """;
@@ -198,16 +196,16 @@ public final class OpenApiExamples {
             [
               {
                 "jobId": "00000000-0000-0000-0000-000000000301",
-                "selectedClassId": "class-permit-application",
+                "selectedClassId": "https://slovník.gov.cz/example",
                 "status": "COMPLETED",
                 "newRelationshipSuggestions": [
                   {
-                    "suggestionID": "relationship-decided-by",
+                    "suggestionID": "00000000-0000-0000-0000-000000000204",
                     "sourceClass": {
-                      "id": "class-permit-application"
+                      "id": "https://slovník.gov.cz/example"
                     },
                     "targetClass": {
-                      "id": "class-competent-authority"
+                      "id": "https://slovník.gov.cz/example2"
                     },
                     "name": {
                       "cs": "rozhoduje"
