@@ -41,8 +41,6 @@ public class SuggestionGenerator {
                     TermType.CLASS,
                     index == 1 ? List.of() : List.of(new IdReference("class_%03d".formatted(index - 1))),
                     legalAct
-//                    occurrences(index, references),
-//                    references
             ));
         }
         return suggestions;
@@ -68,8 +66,6 @@ public class SuggestionGenerator {
                     LangString.cs("A property of class " + request.selectedClassId() + "."),
                     LangString.cs("Suggested from the selected passages and contextual model."),
                     legalAct
-//                    occurrences(index, references),
-//                    references
             ));
         }
         return suggestions;
@@ -90,8 +86,6 @@ public class SuggestionGenerator {
                     LangString.cs("A relationship involving class " + request.selectedClassId() + "."),
                     LangString.cs("Suggested from co-occurring obligations, rights, or references in the text."),
                     legalAct
-//                    occurrences(index, references),
-//                    references
             ));
         }
         return suggestions;

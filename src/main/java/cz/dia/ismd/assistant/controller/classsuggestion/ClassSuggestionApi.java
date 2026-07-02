@@ -78,9 +78,21 @@ public interface ClassSuggestionApi {
             }
     )
     JobStartResponse startClassSuggestions(
-            @Parameter(example = "2024") int year,
-            @Parameter(example = "1") int number,
-            @Parameter(example = "2024-01-15") LocalDate date,
+            @Parameter(
+                    description = "Publication year of the legal act to use as suggestion context. The example described is for legal act 1/2024.",
+                    example = "2024"
+            )
+            int year,
+            @Parameter(
+                    description = "Official number of the legal act within the publication year. The example described is for legal act 1/2024.",
+                    example = "1"
+            )
+            int number,
+            @Parameter(
+                    description = "Date version of the legal act to use for the suggestion job (znění).",
+                    example = "2024-01-15"
+            )
+            LocalDate date,
             Jwt jwt,
             ClassSuggestionJobRequest request
     );

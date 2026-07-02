@@ -1,4 +1,9 @@
 package cz.dia.ismd.assistant.records.suggestion;
 
-public record IdReference(String id) {
+import io.swagger.v3.oas.annotations.media.Schema;
+
+public record IdReference(
+        @Schema(description = "Identifier of the referenced conceptual model term.")
+        String id
+) {
 }

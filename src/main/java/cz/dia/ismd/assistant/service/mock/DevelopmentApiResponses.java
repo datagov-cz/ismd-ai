@@ -4,6 +4,7 @@ import cz.dia.ismd.assistant.domain.JobStatus;
 import cz.dia.ismd.assistant.domain.TermType;
 import cz.dia.ismd.assistant.dto.classsuggestion.ClassSuggestionsJobResponse;
 import cz.dia.ismd.assistant.dto.classsuggestion.JobStartResponse;
+import cz.dia.ismd.assistant.dto.feedback.FeedbackResponse;
 import cz.dia.ismd.assistant.dto.propertysuggestion.PropertySuggestionsJobResponse;
 import cz.dia.ismd.assistant.dto.relationshipsuggestion.RelationshipSuggestionsJobResponse;
 import cz.dia.ismd.assistant.records.classsuggestion.ClassSuggestion;
@@ -14,7 +15,6 @@ import cz.dia.ismd.assistant.records.suggestion.LangString;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Component
@@ -98,15 +98,15 @@ public class DevelopmentApiResponses {
         ));
     }
 
-    public Map<String, String> acceptFeedback() {
-        return Map.of("status", "accepted", "type", "accepted");
+    public FeedbackResponse acceptFeedback() {
+        return new FeedbackResponse("accepted", "accepted");
     }
 
-    public Map<String, String> likeFeedback() {
-        return Map.of("status", "accepted", "type", "liked");
+    public FeedbackResponse likeFeedback() {
+        return new FeedbackResponse("accepted", "liked");
     }
 
-    public Map<String, String> dislikeFeedback() {
-        return Map.of("status", "accepted", "type", "disliked");
+    public FeedbackResponse dislikeFeedback() {
+        return new FeedbackResponse("accepted", "disliked");
     }
 }

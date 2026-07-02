@@ -1,8 +1,14 @@
 package cz.dia.ismd.assistant.dto.classsuggestion;
 
 import cz.dia.ismd.assistant.domain.JobStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
 
-public record JobStartResponse(UUID jobId, JobStatus status) {
+public record JobStartResponse(
+        @Schema(description = "Identifier of the newly started suggestion job.")
+        UUID jobId,
+        @Schema(description = "Initial processing status of the suggestion job.")
+        JobStatus status
+) {
 }

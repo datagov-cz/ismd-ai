@@ -2,6 +2,7 @@ package cz.dia.ismd.assistant.controller.feedback;
 
 import cz.dia.ismd.assistant.controller.OpenApiExamples;
 import cz.dia.ismd.assistant.dto.feedback.FeedbackRequest;
+import cz.dia.ismd.assistant.dto.feedback.FeedbackResponse;
 import cz.dia.ismd.assistant.records.exception.ErrorResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -33,7 +34,7 @@ public interface FeedbackApi {
                     responseCode = "200",
                     description = "Development response.",
                     content = @Content(
-                            schema = @Schema(implementation = Object.class),
+                            schema = @Schema(implementation = FeedbackResponse.class),
                             examples = @ExampleObject(
                                     name = "Accepted feedback response",
                                     value = OpenApiExamples.FEEDBACK_ACCEPT_RESPONSE
@@ -77,7 +78,7 @@ public interface FeedbackApi {
                     responseCode = "200",
                     description = "Development response.",
                     content = @Content(
-                            schema = @Schema(implementation = Object.class),
+                            schema = @Schema(implementation = FeedbackResponse.class),
                             examples = @ExampleObject(
                                     name = "Liked feedback response",
                                     value = OpenApiExamples.FEEDBACK_LIKE_RESPONSE
@@ -121,7 +122,7 @@ public interface FeedbackApi {
                     responseCode = "200",
                     description = "Development response.",
                     content = @Content(
-                            schema = @Schema(implementation = Object.class),
+                            schema = @Schema(implementation = FeedbackResponse.class),
                             examples = @ExampleObject(
                                     name = "Disliked feedback response",
                                     value = OpenApiExamples.FEEDBACK_DISLIKE_RESPONSE
