@@ -11,6 +11,7 @@ import cz.dia.ismd.assistant.service.suggestion.SuggestionJobService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.OffsetDateTime;
@@ -38,10 +39,12 @@ public class FeedbackService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    @Transactional
     public void record(FeedbackRecord record) {
         record(List.of(record));
     }
 
+    @Transactional
     public void record(List<FeedbackRecord> records) {
         if (records.isEmpty()) {
             return;
@@ -65,6 +68,7 @@ public class FeedbackService {
         }
     }
 
+    @Transactional
     public void record(UUID jobId, String suggestionId, FeedbackType type) {
         record(new FeedbackRecord(jobId, suggestionId, type, Instant.now()));
     }
@@ -90,6 +94,7 @@ public class FeedbackService {
         };
     }
 
+    @Transactional(readOnly = true)
     public List<FeedbackRecord> records() {
         return jdbcTemplate.query("""
                 SELECT job_id, suggestion_id, feedback_type, created_at
