@@ -11,7 +11,9 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.List;
 
@@ -59,7 +61,7 @@ public interface FeedbackApi {
                     )
             )
     })
-    ResponseEntity<?> accept(List<FeedbackRequest> requests);
+    ResponseEntity<?> accept(@Valid @RequestBody List<@Valid FeedbackRequest> requests);
 
     @Operation(
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -103,7 +105,7 @@ public interface FeedbackApi {
                     )
             )
     })
-    ResponseEntity<?> like(List<FeedbackRequest> requests);
+    ResponseEntity<?> like(@Valid @RequestBody List<@Valid FeedbackRequest> requests);
 
     @Operation(
             requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -147,5 +149,5 @@ public interface FeedbackApi {
                     )
             )
     })
-    ResponseEntity<?> dislike(List<FeedbackRequest> requests);
+    ResponseEntity<?> dislike(@Valid @RequestBody List<@Valid FeedbackRequest> requests);
 }

@@ -8,7 +8,6 @@ import cz.dia.ismd.assistant.records.suggestion.DocumentContext;
 import cz.dia.ismd.assistant.service.environment.ApiEnvironment;
 import cz.dia.ismd.assistant.service.mock.DevelopmentApiResponses;
 import cz.dia.ismd.assistant.service.suggestion.SuggestionJobService;
-import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -50,7 +49,7 @@ public class RelationshipSuggestionController implements RelationshipSuggestionA
             @PathVariable int number,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody RelationshipSuggestionJobRequest request
+            @RequestBody RelationshipSuggestionJobRequest request
     ) {
         if (apiEnvironment.isDevelopment()) {
             return developmentApiResponses.startRelationshipSuggestions();

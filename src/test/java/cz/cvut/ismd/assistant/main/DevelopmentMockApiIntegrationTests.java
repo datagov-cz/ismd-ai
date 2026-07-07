@@ -14,6 +14,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DevelopmentMockApiIntegrationTests extends AssistantIntegrationTest {
 
     @Test
+    void allowsRequestsWithoutOidcAuthenticationInDevelopment() throws Exception {
+        mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "k": 1,
+                                  "context_text": "This input is ignored in development"
+                                }
+                                """))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.job_id").value("00000000-0000-0000-0000-000000000101"))
+                .andExpect(jsonPath("$.status").value("in_progress"));
+    }
+
+    @Test
     void returnsPredeterminedClassSuggestionResponses() throws Exception {
         mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs")
                         .with(oidcAuthentication())

@@ -12,7 +12,9 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import jakarta.validation.Valid;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -94,7 +96,7 @@ public interface ClassSuggestionApi {
             )
             LocalDate date,
             Jwt jwt,
-            ClassSuggestionJobRequest request
+            @Valid @RequestBody ClassSuggestionJobRequest request
     );
 
     @Operation(

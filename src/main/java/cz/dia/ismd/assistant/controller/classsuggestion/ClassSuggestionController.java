@@ -8,7 +8,6 @@ import cz.dia.ismd.assistant.dto.classsuggestion.JobStartResponse;
 import cz.dia.ismd.assistant.service.environment.ApiEnvironment;
 import cz.dia.ismd.assistant.service.mock.DevelopmentApiResponses;
 import cz.dia.ismd.assistant.service.suggestion.SuggestionJobService;
-import jakarta.validation.Valid;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -50,7 +49,7 @@ public class ClassSuggestionController implements ClassSuggestionApi {
             @PathVariable int number,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody ClassSuggestionJobRequest request
+            @RequestBody ClassSuggestionJobRequest request
     ) {
         if (apiEnvironment.isDevelopment()) {
             return developmentApiResponses.startClassSuggestions();
