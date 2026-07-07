@@ -54,20 +54,6 @@ Supported providers are `OPENAI`, `OPENAI_COMPATIBLE`, `AZURE_OPENAI`,
 and Google Gemini endpoints may include `{model}`, which is replaced with
 `APP_LLM_MODEL`.
 
-Authenticated LLM endpoint:
-
-```http
-POST /llm
-Content-Type: application/json
-
-{
-  "system_prompt": "You are concise.",
-  "prompt": "Reply with one sentence.",
-  "max_tokens": 128,
-  "temperature": 0.2
-}
-```
-
 ## API Docs
 
 When the server is running:
@@ -82,7 +68,7 @@ When the server is running:
 - Accepted, liked, and disliked suggestion feedback
 - OIDC bearer-token authentication
 - In-memory asynchronous jobs
-- Configurable LLM client and test endpoint
+- Configurable LLM client
 
 ## Test
 
