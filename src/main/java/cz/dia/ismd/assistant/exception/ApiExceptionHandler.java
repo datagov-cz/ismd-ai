@@ -2,6 +2,7 @@ package cz.dia.ismd.assistant.exception;
 
 import cz.dia.ismd.assistant.records.exception.ErrorResponse;
 import cz.dia.ismd.assistant.service.llm.LlmException;
+import cz.dia.ismd.assistant.service.sparql.SparqlAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -28,6 +29,11 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(LlmException.class)
     public ResponseEntity<ErrorResponse> handleLlmException(LlmException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new ErrorResponse(exception.getMessage()));
+    }
+
+    @ExceptionHandler(SparqlAccessException.class)
+    public ResponseEntity<ErrorResponse> handleSparqlAccessException(SparqlAccessException exception) {
         return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(new ErrorResponse(exception.getMessage()));
     }
 

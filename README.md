@@ -26,12 +26,50 @@ Configure the OIDC issuer and JWK set URL with environment variables or properti
 OIDC_ISSUER_URI=https://issuer.example.com/realms/ismd
 OIDC_JWK_SET_URI=https://issuer.example.com/realms/ismd/protocol/openid-connect/certs
 APP_TOKENS_MAX_ALLOWED_PER_DAY=100000
+APP_SPARQL_ENDPOINT_URL=https://opendata.eselpoint.gov.cz/sparql
+APP_SPARQL_TIMEOUT=10s
+APP_SPARQL_MAX_ATTEMPTS=3
+APP_SPARQL_RETRY_BACKOFF=250ms
 APP_DB_HOST=localhost
 APP_DB_PORT=5432
 APP_DB_NAME=ismd
 APP_DB_USER=ismd
 APP_DB_PASSWORD=ismd
 ```
+
+## SPARQL Access
+
+Use `SparqlQueryExecutor` for services that call the configured SPARQL endpoint.
+It centralizes retry behavior, query timeouts, endpoint error messages, and
+`SparqlAccessException` reporting.
+
+For RDF4J tuple queries, inject the executor and keep result mapping inside the
+lambda:
+
+```java
+return sparqlQueryExecutor.query("sample resource query", connection -> {
+    try (TupleQueryResult result = sparqlQueryExecutor.evaluateTupleQuery(connection, QUERY)) {
+        // map bindings here
+    }
+});
+```
+
+For services that need the configured `RestClient`, wrap the HTTP call:
+
+```java
+return sparqlQueryExecutor.execute("legal act repository query", () ->
+        sparqlRestClient.post()
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(formData)
+                .retrieve()
+                .body(JsonNode.class)
+);
+```
+
+Use a short operation name that identifies the query in logs and error
+responses. Do not add service-local retry loops around SPARQL calls; configure
+`APP_SPARQL_TIMEOUT`, `APP_SPARQL_MAX_ATTEMPTS`, and
+`APP_SPARQL_RETRY_BACKOFF` instead.
 
 ## LLM Configuration
 

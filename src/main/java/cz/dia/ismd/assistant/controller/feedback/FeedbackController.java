@@ -1,9 +1,9 @@
 package cz.dia.ismd.assistant.controller.feedback;
 
+import cz.dia.ismd.assistant.dto.feedback.FeedbackResponse;
 import cz.dia.ismd.assistant.service.feedback.FeedbackService;
 import cz.dia.ismd.assistant.data.feedback.FeedbackType;
 import cz.dia.ismd.assistant.dto.feedback.FeedbackRequest;
-import cz.dia.ismd.assistant.service.classdata.ClassDataSampleQueryService;
 import cz.dia.ismd.assistant.service.environment.ApiEnvironment;
 import cz.dia.ismd.assistant.service.mock.DevelopmentApiResponses;
 import org.springframework.http.ResponseEntity;
@@ -19,23 +19,20 @@ public class FeedbackController implements FeedbackApi {
     private final FeedbackService feedbackService;
     private final ApiEnvironment apiEnvironment;
     private final DevelopmentApiResponses developmentApiResponses;
-    private final ClassDataSampleQueryService classDataSampleQueryService;
 
     public FeedbackController(
             FeedbackService feedbackService,
             ApiEnvironment apiEnvironment,
-            DevelopmentApiResponses developmentApiResponses,
-            ClassDataSampleQueryService classDataSampleQueryService
+            DevelopmentApiResponses developmentApiResponses
     ) {
         this.feedbackService = feedbackService;
         this.apiEnvironment = apiEnvironment;
         this.developmentApiResponses = developmentApiResponses;
-        this.classDataSampleQueryService = classDataSampleQueryService;
     }
 
     @PostMapping("/accept-suggestion")
     @Override
-    public ResponseEntity<?> accept(@RequestBody List<FeedbackRequest> requests) {
+    public ResponseEntity<FeedbackResponse> accept(@RequestBody List<FeedbackRequest> requests) {
         if (apiEnvironment.isDevelopment()) {
             return ResponseEntity.ok(developmentApiResponses.acceptFeedback());
         }
@@ -45,7 +42,7 @@ public class FeedbackController implements FeedbackApi {
 
     @PostMapping("/like-suggestion")
     @Override
-    public ResponseEntity<?> like(@RequestBody List<FeedbackRequest> requests) {
+    public ResponseEntity<FeedbackResponse> like(@RequestBody List<FeedbackRequest> requests) {
         if (apiEnvironment.isDevelopment()) {
             return ResponseEntity.ok(developmentApiResponses.likeFeedback());
         }
@@ -55,7 +52,7 @@ public class FeedbackController implements FeedbackApi {
 
     @PostMapping("/dislike-suggestion")
     @Override
-    public ResponseEntity<?> dislike(@RequestBody List<FeedbackRequest> requests) {
+    public ResponseEntity<FeedbackResponse> dislike(@RequestBody List<FeedbackRequest> requests) {
         if (apiEnvironment.isDevelopment()) {
             return ResponseEntity.ok(developmentApiResponses.dislikeFeedback());
         }
