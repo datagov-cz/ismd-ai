@@ -19,6 +19,7 @@ import java.net.URI;
 import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -69,8 +70,18 @@ public class SparqlQueryExecutor {
     }
 
     public TupleQueryResult evaluateTupleQuery(RepositoryConnection connection, String sparqlQuery) {
+        return evaluateTupleQuery(connection, sparqlQuery, query -> {
+        });
+    }
+
+    public TupleQueryResult evaluateTupleQuery(
+            RepositoryConnection connection,
+            String sparqlQuery,
+            Consumer<TupleQuery> queryCustomizer
+    ) {
         TupleQuery query = connection.prepareTupleQuery(sparqlQuery);
         query.setMaxExecutionTime(queryTimeoutSeconds);
+        queryCustomizer.accept(query);
         return query.evaluate();
     }
 
