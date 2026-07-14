@@ -38,17 +38,22 @@ class LegalActPersistenceIntegrationTests extends AssistantIntegrationTest {
                 .contains(createdAct);
 
         LegalActText firstText = legalActTextService.create(new LegalActText(
-                null, createdAct.id(), "First version", "official-1", "12/2025", null
+                null, createdAct.id(), "2025/12/2025-02-03/dokument/norma/par_1",
+                "First version", "paragraph", "1"
         ));
         LegalActText secondText = legalActTextService.create(new LegalActText(
-                null, createdAct.id(), "Second version", "official-2", "12/2025", null
+                null, createdAct.id(), "2025/12/2025-02-03/dokument/norma/par_2",
+                "Second version", "paragraph", "2"
         ));
 
-        LegalActText linkedFirstText = legalActTextService.update(firstText.id(), new LegalActText(
-                firstText.id(), createdAct.id(), "First version", "official-1", "12/2025", secondText.id()
+        LegalActText updatedFirstText = legalActTextService.update(firstText.id(), new LegalActText(
+                firstText.id(), createdAct.id(), firstText.path(), "Updated first version", "paragraph", "1"
         )).orElseThrow();
-        assertThat(linkedFirstText.successorId()).isEqualTo(secondText.id());
+        assertThat(updatedFirstText.legalText()).isEqualTo("Updated first version");
         assertThat(legalActTextService.findByLegalActId(createdAct.id()))
+                .extracting(LegalActText::id)
+                .containsExactly(firstText.id(), secondText.id());
+        assertThat(legalActTextService.findByPathPrefix("2025/12/2025-02-03/dokument/norma"))
                 .extracting(LegalActText::id)
                 .containsExactly(firstText.id(), secondText.id());
 
@@ -58,9 +63,6 @@ class LegalActPersistenceIntegrationTests extends AssistantIntegrationTest {
         )).orElseThrow();
         assertThat(updatedAct.title()).isEqualTo("Updated title");
 
-        legalActTextService.update(firstText.id(), new LegalActText(
-                firstText.id(), createdAct.id(), "First version", "official-1", "12/2025", null
-        ));
         assertThat(legalActTextService.delete(secondText.id())).isTrue();
         assertThat(legalActTextService.delete(firstText.id())).isTrue();
         assertThat(legalActService.delete(createdAct.id())).isTrue();

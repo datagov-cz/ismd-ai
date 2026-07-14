@@ -11,69 +11,68 @@ import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.core.env.Environment;
 
 import java.time.LocalDate;
 import java.time.Year;
+import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class LegalActSPARQLServiceTests {
 
+    private static final String NAMESPACE = "https://data.example/eli/cz/sb/";
+    private static final String ELI_PATH =
+            "2026/60/2026-05-27/dokument/norma/cast_1/hlava_3/par_16/odst_2/pism_g";
+
     @Test
     @SuppressWarnings("unchecked")
-    void retrievesLegalActFragmentsAndStoresThem() {
+    void retrievesFullEliFromSparqlAndCachesMappedText() {
         SparqlQueryExecutor queryExecutor = mock(SparqlQueryExecutor.class);
         Environment environment = mock(Environment.class);
         LegalActService legalActService = mock(LegalActService.class);
         LegalActTextService legalActTextService = mock(LegalActTextService.class);
         RepositoryConnection connection = mock(RepositoryConnection.class);
-        TupleQueryResult nameResult = mock(TupleQueryResult.class);
         TupleQueryResult contentResult = mock(TupleQueryResult.class);
+        TupleQueryResult nameResult = mock(TupleQueryResult.class);
+        BindingSet contentBinding = contentBinding(ELI_PATH, "Text of paragraph", "paragraph", "16.2.7");
         BindingSet nameBinding = mock(BindingSet.class);
-        BindingSet firstFragment = fragmentBinding(
-                "https://example.test/fragment/1", "§ 1", "First fragment"
-        );
-        BindingSet secondFragment = fragmentBinding(
-                "https://example.test/fragment/2", "§ 2", "Second fragment"
-        );
         var valueFactory = SimpleValueFactory.getInstance();
 
-        when(environment.getProperty("app.sparql.eli.namespace"))
-                .thenReturn("https://example.test/eli/cz/sb/");
+        when(environment.getProperty("app.sparql.eli.namespace")).thenReturn(NAMESPACE);
         when(queryExecutor.query(anyString(), any())).thenAnswer(invocation -> {
             Function<RepositoryConnection, Object> operation = invocation.getArgument(1);
             return operation.apply(connection);
         });
-        when(queryExecutor.evaluateTupleQuery(any(), anyString(), any()))
-                .thenReturn(nameResult, contentResult);
-
+        when(queryExecutor.evaluateTupleQuery(any(), anyString())).thenReturn(contentResult);
+        when(queryExecutor.evaluateTupleQuery(any(), anyString(), any())).thenReturn(nameResult);
+        when(contentResult.hasNext()).thenReturn(true, false);
+        when(contentResult.next()).thenReturn(contentBinding);
         when(nameResult.hasNext()).thenReturn(true);
         when(nameResult.next()).thenReturn(nameBinding);
-        when(nameBinding.getValue("nazev")).thenReturn(valueFactory.createLiteral("Test act"));
+        when(nameBinding.getValue("nazev")).thenReturn(valueFactory.createLiteral("Test legal act"));
 
-        when(contentResult.hasNext()).thenReturn(true, true, false);
-        when(contentResult.next()).thenReturn(firstFragment, secondFragment);
-
-        when(legalActService.find(1, Year.of(2024), LocalDate.of(2024, 1, 1)))
+        when(legalActTextService.findByPathPrefix(ELI_PATH)).thenReturn(List.of());
+        when(legalActTextService.findByPath(ELI_PATH)).thenReturn(Optional.empty());
+        when(legalActService.find(60, Year.of(2026), LocalDate.of(2026, 5, 27)))
                 .thenReturn(Optional.empty());
         when(legalActService.create(any())).thenReturn(new LegalAct(
-                42L, 1, Year.of(2024), LocalDate.of(2024, 1, 1), "Test act", null, null
+                42L, 60, Year.of(2026), LocalDate.of(2026, 5, 27), "Test legal act", null, null
         ));
-        AtomicLong textId = new AtomicLong(100);
         when(legalActTextService.create(any())).thenAnswer(invocation -> {
             LegalActText text = invocation.getArgument(0);
             return new LegalActText(
-                    textId.getAndIncrement(), text.legalActId(), text.legalText(),
-                    text.officialId(), text.officialNumber(), text.successorId()
+                    100L, text.legalActId(), text.path(), text.legalText(),
+                    text.legalHierarchy(), text.legalOrder()
             );
         });
 
@@ -81,25 +80,49 @@ class LegalActSPARQLServiceTests {
                 queryExecutor, environment, legalActService, legalActTextService
         );
 
-        assertThat(service.retrieveAndStoreLegalActContent(
-                "https://example.test/eli/cz/sb/2024/1/2024-01-01"
-        )).satisfiesExactly(
-                text -> assertThat(text).usingRecursiveComparison().isEqualTo(new LegalActText(
-                        100L, 42L, "First fragment", "https://example.test/fragment/1", "§ 1", null
-                )),
-                text -> assertThat(text).usingRecursiveComparison().isEqualTo(new LegalActText(
-                        101L, 42L, "Second fragment", "https://example.test/fragment/2", "§ 2", null
-                ))
-        );
-        verify(legalActService).create(any(LegalAct.class));
+        assertThat(service.retrieveLegalActTexts(List.of(
+                "https://e-sbirka.gov.cz/eli/cz/sb/" + ELI_PATH
+        ))).containsExactly(new LegalActText(
+                100L, 42L, ELI_PATH, "Text of paragraph", "paragraph", "16.2.7"
+        ));
+
+        ArgumentCaptor<String> contentQuery = ArgumentCaptor.forClass(String.class);
+        verify(queryExecutor).evaluateTupleQuery(any(), contentQuery.capture());
+        assertThat(contentQuery.getValue()).contains("VALUES ?predek {", "<" + NAMESPACE + ELI_PATH + ">");
+
+        ArgumentCaptor<LegalAct> legalAct = ArgumentCaptor.forClass(LegalAct.class);
+        verify(legalActService).create(legalAct.capture());
+        assertThat(legalAct.getValue()).usingRecursiveComparison().isEqualTo(new LegalAct(
+                null, 60, Year.of(2026), LocalDate.of(2026, 5, 27), "Test legal act", null, null
+        ));
     }
 
-    private BindingSet fragmentBinding(String id, String number, String text) {
+    @Test
+    void returnsCachedTextWithoutCallingSparql() {
+        SparqlQueryExecutor queryExecutor = mock(SparqlQueryExecutor.class);
+        Environment environment = mock(Environment.class);
+        LegalActService legalActService = mock(LegalActService.class);
+        LegalActTextService legalActTextService = mock(LegalActTextService.class);
+        LegalActText cached = new LegalActText(1L, 2L, ELI_PATH, "Cached", "paragraph", "1");
+        when(legalActTextService.findByPathPrefix(ELI_PATH)).thenReturn(List.of(cached));
+
+        LegalActSPARQLService service = new LegalActSPARQLService(
+                queryExecutor, environment, legalActService, legalActTextService
+        );
+
+        assertThat(service.retrieveLegalActTexts(List.of(
+                "https://another-website.test/eli/cz/sb/" + ELI_PATH
+        ))).containsExactly(cached);
+        verify(queryExecutor, never()).query(anyString(), any());
+    }
+
+    private BindingSet contentBinding(String path, String text, String hierarchy, String order) {
         BindingSet bindingSet = mock(BindingSet.class);
         var valueFactory = SimpleValueFactory.getInstance();
-        when(bindingSet.getValue("fragment")).thenReturn(valueFactory.createIRI(id));
-        when(bindingSet.getValue("citace")).thenReturn(valueFactory.createLiteral(number));
+        when(bindingSet.getValue("zneni")).thenReturn(valueFactory.createIRI(NAMESPACE + path));
         when(bindingSet.getValue("obsah")).thenReturn(valueFactory.createLiteral(text));
+        when(bindingSet.getValue("hierarchie")).thenReturn(valueFactory.createLiteral(hierarchy));
+        when(bindingSet.getValue("poradi")).thenReturn(valueFactory.createLiteral(order));
         return bindingSet;
     }
 }

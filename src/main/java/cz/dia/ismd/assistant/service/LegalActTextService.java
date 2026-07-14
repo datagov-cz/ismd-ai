@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.PreparedStatement;
-import java.sql.Types;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -18,14 +17,14 @@ import java.util.Optional;
 public class LegalActTextService {
 
     private static final String COLUMNS =
-            "id, legal_act_id, legal_text, official_id, official_number, successor";
+            "id, legal_act_id, path, legal_text, legal_hierarchy, legal_order";
     private static final RowMapper<LegalActText> ROW_MAPPER = (resultSet, rowNum) -> new LegalActText(
             resultSet.getLong("id"),
             resultSet.getLong("legal_act_id"),
+            resultSet.getString("path"),
             resultSet.getString("legal_text"),
-            resultSet.getString("official_id"),
-            resultSet.getString("official_number"),
-            resultSet.getObject("successor", Long.class)
+            resultSet.getString("legal_hierarchy"),
+            resultSet.getString("legal_order")
     );
 
     private final JdbcTemplate jdbcTemplate;
@@ -41,14 +40,14 @@ public class LegalActTextService {
         jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
                     INSERT INTO legal_act_texts(
-                        legal_act_id, legal_text, official_id, official_number, successor
+                        legal_act_id, path, legal_text, legal_hierarchy, legal_order
                     ) VALUES (?, ?, ?, ?, ?)
                     """, new String[]{"id"});
             statement.setLong(1, legalActText.legalActId());
-            statement.setString(2, legalActText.legalText());
-            statement.setString(3, legalActText.officialId());
-            statement.setString(4, legalActText.officialNumber());
-            setNullableLong(statement, 5, legalActText.successorId());
+            statement.setString(2, legalActText.path());
+            statement.setString(3, legalActText.legalText());
+            statement.setString(4, legalActText.legalHierarchy());
+            statement.setString(5, legalActText.legalOrder());
             return statement;
         }, keyHolder);
 
@@ -74,6 +73,29 @@ public class LegalActTextService {
     }
 
     @Transactional(readOnly = true)
+    public List<LegalActText> findByPathPrefix(String path) {
+        Objects.requireNonNull(path, "path must not be null");
+        String escapedPath = path
+                .replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_");
+        return jdbcTemplate.query("""
+                SELECT %s
+                FROM legal_act_texts
+                WHERE path = ? OR path LIKE ? ESCAPE '\\'
+                ORDER BY legal_order, id
+                """.formatted(COLUMNS), ROW_MAPPER, path, escapedPath + "/%");
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<LegalActText> findByPath(String path) {
+        Objects.requireNonNull(path, "path must not be null");
+        return jdbcTemplate.query("SELECT " + COLUMNS + " FROM legal_act_texts WHERE path = ?", ROW_MAPPER, path)
+                .stream()
+                .findFirst();
+    }
+
+    @Transactional(readOnly = true)
     public List<LegalActText> findAll() {
         return jdbcTemplate.query("SELECT " + COLUMNS + " FROM legal_act_texts ORDER BY id", ROW_MAPPER);
     }
@@ -84,14 +106,14 @@ public class LegalActTextService {
         int updated = jdbcTemplate.update(connection -> {
             PreparedStatement statement = connection.prepareStatement("""
                     UPDATE legal_act_texts
-                    SET legal_act_id = ?, legal_text = ?, official_id = ?, official_number = ?, successor = ?
+                    SET legal_act_id = ?, path = ?, legal_text = ?, legal_hierarchy = ?, legal_order = ?
                     WHERE id = ?
                     """);
             statement.setLong(1, legalActText.legalActId());
-            statement.setString(2, legalActText.legalText());
-            statement.setString(3, legalActText.officialId());
-            statement.setString(4, legalActText.officialNumber());
-            setNullableLong(statement, 5, legalActText.successorId());
+            statement.setString(2, legalActText.path());
+            statement.setString(3, legalActText.legalText());
+            statement.setString(4, legalActText.legalHierarchy());
+            statement.setString(5, legalActText.legalOrder());
             statement.setLong(6, id);
             return statement;
         });
@@ -105,16 +127,9 @@ public class LegalActTextService {
 
     private static void requireFields(LegalActText legalActText) {
         Objects.requireNonNull(legalActText, "legalActText must not be null");
+        Objects.requireNonNull(legalActText.path(), "legalActText.path must not be null");
         Objects.requireNonNull(legalActText.legalText(), "legalActText.legalText must not be null");
-        Objects.requireNonNull(legalActText.officialId(), "legalActText.officialId must not be null");
-        Objects.requireNonNull(legalActText.officialNumber(), "legalActText.officialNumber must not be null");
-    }
-
-    private static void setNullableLong(PreparedStatement statement, int index, Long value) throws java.sql.SQLException {
-        if (value == null) {
-            statement.setNull(index, Types.BIGINT);
-        } else {
-            statement.setLong(index, value);
-        }
+        Objects.requireNonNull(legalActText.legalHierarchy(), "legalActText.legalHierarchy must not be null");
+        Objects.requireNonNull(legalActText.legalOrder(), "legalActText.legalOrder must not be null");
     }
 }
