@@ -110,6 +110,12 @@ When the server is running:
 
 ## Test
 
+Docker must be installed and running, and its daemon must be accessible to the
+Maven process. The integration tests use Testcontainers to start an isolated
+PostgreSQL container automatically; no separately configured test database is
+required. Database-backed integration tests are skipped when Docker is not
+available.
+
 ```bash
 mvn test
 ```
