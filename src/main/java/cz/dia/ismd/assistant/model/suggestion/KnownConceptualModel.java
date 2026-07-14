@@ -1,5 +1,8 @@
 package cz.dia.ismd.assistant.model.suggestion;
 
+import cz.dia.ismd.assistant.model.suggestion.attribute.KnownAttributeTerm;
+import cz.dia.ismd.assistant.model.suggestion.classsuggestion.KnownClassTerm;
+import cz.dia.ismd.assistant.model.suggestion.relationship.KnownRelationshipTerm;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 

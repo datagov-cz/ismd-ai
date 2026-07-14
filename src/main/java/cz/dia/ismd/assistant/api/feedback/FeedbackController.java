@@ -1,5 +1,6 @@
 package cz.dia.ismd.assistant.api.feedback;
 
+import cz.dia.ismd.assistant.api.DevelopmentApiResponses;
 import cz.dia.ismd.assistant.service.FeedbackService;
 import cz.dia.ismd.assistant.model.feedback.FeedbackType;
 import cz.dia.ismd.assistant.config.ApiEnvironment;

@@ -2,6 +2,7 @@ package cz.dia.ismd.assistant.model.suggestion.relationship;
 
 import cz.dia.ismd.assistant.model.suggestion.IdReference;
 import cz.dia.ismd.assistant.model.suggestion.LangString;
+import cz.dia.ismd.assistant.model.suggestion.ValidationPatterns;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Pattern;
 

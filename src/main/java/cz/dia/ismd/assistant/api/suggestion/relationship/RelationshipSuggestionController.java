@@ -1,5 +1,7 @@
 package cz.dia.ismd.assistant.api.suggestion.relationship;
 
+import cz.dia.ismd.assistant.api.DevelopmentApiResponses;
+import cz.dia.ismd.assistant.api.job.JobStartResponse;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.model.suggestion.DocumentContext;
 import cz.dia.ismd.assistant.config.ApiEnvironment;

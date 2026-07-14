@@ -1,5 +1,8 @@
 package cz.dia.ismd.assistant.model.job;
 
+import cz.dia.ismd.assistant.model.suggestion.attribute.AttributeSuggestion;
+import cz.dia.ismd.assistant.model.suggestion.classsuggestion.ClassSuggestion;
+import cz.dia.ismd.assistant.model.suggestion.relationship.RelationshipSuggestion;
 
 import java.time.Instant;
 import java.util.List;

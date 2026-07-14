@@ -1,5 +1,10 @@
 package cz.dia.ismd.assistant.api;
 
+import cz.dia.ismd.assistant.api.feedback.FeedbackResponse;
+import cz.dia.ismd.assistant.api.job.JobStartResponse;
+import cz.dia.ismd.assistant.api.suggestion.attribute.PropertySuggestionsJobResponse;
+import cz.dia.ismd.assistant.api.suggestion.classsuggestion.ClassSuggestionsJobResponse;
+import cz.dia.ismd.assistant.api.suggestion.relationship.RelationshipSuggestionsJobResponse;
 import cz.dia.ismd.assistant.model.job.JobStatus;
 import cz.dia.ismd.assistant.model.suggestion.TermType;
 import cz.dia.ismd.assistant.model.suggestion.classsuggestion.ClassSuggestion;

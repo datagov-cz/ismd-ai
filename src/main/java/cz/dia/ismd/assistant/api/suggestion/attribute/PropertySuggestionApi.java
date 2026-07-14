@@ -1,5 +1,8 @@
 package cz.dia.ismd.assistant.api.suggestion.attribute;
 
+import cz.dia.ismd.assistant.api.ErrorResponse;
+import cz.dia.ismd.assistant.api.OpenApiExamples;
+import cz.dia.ismd.assistant.api.job.JobStartResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.ArraySchema;

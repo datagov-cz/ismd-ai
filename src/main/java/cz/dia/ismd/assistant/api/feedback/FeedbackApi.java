@@ -1,5 +1,7 @@
 package cz.dia.ismd.assistant.api.feedback;
 
+import cz.dia.ismd.assistant.api.ErrorResponse;
+import cz.dia.ismd.assistant.api.OpenApiExamples;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
