@@ -14,7 +14,7 @@ public record ClassSuggestion(
         LangString name,
         @Schema(description = "Localized definition (definice) of the suggested class.")
         LangString definition,
-        @Schema(description = "Localized explanation (popis) of why the class was suggested.")
+        @Schema(description = "Localized explanation (popis) of the suggested class.")
         LangString explanation,
         @Schema(description = "Type of conceptual model term represented by the suggestion.")
         TermType type,
