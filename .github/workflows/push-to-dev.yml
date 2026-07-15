@@ -1,0 +1,38 @@
+name: Build Dev Branch
+
+concurrency:
+  group: build-dev
+  cancel-in-progress: false
+
+on:
+  push:
+    branches:
+      - dev
+    paths-ignore:
+      - '**/README.md'
+      - '**/*.md'
+      - '**/.gitignore'
+      - '**/LICENCE.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # Tests run here, on the runner, NOT in the image build: the DB integration
+  # tests use Testcontainers, which needs a Docker daemon that `mvn package`
+  # inside `docker buildx build` does not have (they would skip silently).
+  run-tests:
+    name: Run Tests
+    uses: ./.github/workflows/reusable-test.yml
+    secrets: inherit
+
+  build-docker:
+    name: Build Docker Image
+    needs: run-tests
+    if: always() && needs.run-tests.result == 'success'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      branch: dev
+    secrets: inherit
