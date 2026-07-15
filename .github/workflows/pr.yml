@@ -1,0 +1,27 @@
+name: PR Workflow
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+  packages: read
+
+jobs:
+  run-tests:
+    uses: ./.github/workflows/reusable-test.yml
+    secrets: inherit
+
+  # Build-only validation: proves the image builds, without publishing to GHCR.
+  validate-docker-build:
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      branch: ${{ github.base_ref }}
+      push: false
+    secrets: inherit
