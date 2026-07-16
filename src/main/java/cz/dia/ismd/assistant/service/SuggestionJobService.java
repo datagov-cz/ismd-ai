@@ -19,13 +19,16 @@ import java.util.concurrent.ConcurrentHashMap;
 public class SuggestionJobService {
 
     private final SuggestionGenerator suggestionGenerator;
+    private final TokenUsageService tokenUsageService;
     private final Map<UUID, SuggestionJob> jobs = new ConcurrentHashMap<>();
 
-    public SuggestionJobService(SuggestionGenerator suggestionGenerator) {
+    public SuggestionJobService(SuggestionGenerator suggestionGenerator, TokenUsageService tokenUsageService) {
         this.suggestionGenerator = suggestionGenerator;
+        this.tokenUsageService = tokenUsageService;
     }
 
     public SuggestionJob startClassJob(String userId, DocumentContext context, ClassSuggestionJobRequest request) {
+        tokenUsageService.ensureRequestAllowed(userId);
         SuggestionJob job = createJob(JobKind.CLASS, null);
         CompletableFuture.runAsync(() -> {
             try {
@@ -38,6 +41,7 @@ public class SuggestionJobService {
     }
 
     public SuggestionJob startPropertyJob(String userId, DocumentContext context, PropertySuggestionJobRequest request) {
+        tokenUsageService.ensureRequestAllowed(userId);
         SuggestionJob job = createJob(JobKind.PROPERTY, request.selectedClassId());
         CompletableFuture.runAsync(() -> {
             try {
@@ -50,6 +54,7 @@ public class SuggestionJobService {
     }
 
     public SuggestionJob startRelationshipJob(String userId, DocumentContext context, RelationshipSuggestionJobRequest request) {
+        tokenUsageService.ensureRequestAllowed(userId);
         SuggestionJob job = createJob(JobKind.RELATIONSHIP, request.selectedClassId());
         CompletableFuture.runAsync(() -> {
             try {

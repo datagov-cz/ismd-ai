@@ -1,9 +1,8 @@
 package cz.dia.ismd.assistant.exception;
 
-import java.util.UUID;
-
 public class TokenLimitReachedException extends RuntimeException{
-    public TokenLimitReachedException(UUID jobId, String userId) {
-        super("Cannot run job: " + jobId + " for user: " + userId + " because that user's daily token limit has been reached.");
+    public TokenLimitReachedException(String userId, int tokenLimit) {
+        super("Cannot make an LLM request for user: " + userId
+                + " because that user's token limit of " + tokenLimit + " has been reached.");
     }
 }
