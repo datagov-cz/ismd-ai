@@ -2,6 +2,7 @@ package cz.dia.ismd.assistant.api.suggestion.relationship;
 
 import cz.dia.ismd.assistant.api.DevelopmentApiResponses;
 import cz.dia.ismd.assistant.api.job.JobStartResponse;
+import cz.dia.ismd.assistant.model.job.JobStatus;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.model.suggestion.DocumentContext;
 import cz.dia.ismd.assistant.config.ApiEnvironment;
@@ -53,7 +54,7 @@ public class RelationshipSuggestionController implements RelationshipSuggestionA
             return developmentApiResponses.startRelationshipSuggestions();
         }
         SuggestionJob job = suggestionJobService.startRelationshipJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
-        return new JobStartResponse(job.jobId(), job.status());
+        return new JobStartResponse(job.jobId(), JobStatus.IN_PROGRESS);
     }
 
     @GetMapping("/legal-acts/relationship-suggestions-jobs")

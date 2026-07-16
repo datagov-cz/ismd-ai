@@ -43,7 +43,7 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
 
         UUID firstJobId = UUID.fromString(Json.read(firstStart, "job_id"));
         UUID secondJobId = UUID.fromString(Json.read(secondStart, "job_id"));
-        waitForAsyncJob();
+        waitForAsyncJob(firstJobId, secondJobId);
 
         mockMvc.perform(post("/like-suggestion")
                         .with(oidcAuthentication())
@@ -95,7 +95,7 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
                 .andReturn();
 
         UUID jobId = UUID.fromString(Json.read(start, "job_id"));
-        waitForAsyncJob();
+        waitForAsyncJob(jobId);
         int writeCount = 20;
         CountDownLatch startGate = new CountDownLatch(1);
         ExecutorService executor = Executors.newFixedThreadPool(8);
@@ -169,7 +169,7 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
                 .andReturn();
 
         UUID jobId = UUID.fromString(Json.read(start, "job_id"));
-        waitForAsyncJob();
+        waitForAsyncJob(jobId);
 
         mockMvc.perform(post("/like-suggestion")
                         .with(oidcAuthentication())

@@ -31,7 +31,7 @@ class PropertySuggestionIntegrationTests extends AssistantIntegrationTest {
                 .andReturn();
 
         UUID jobId = UUID.fromString(Json.read(start, "job_id"));
-        waitForAsyncJob();
+        waitForAsyncJob(jobId);
 
         mockMvc.perform(get("/legal-acts/property-suggestions-jobs")
                         .queryParam("jobIds", jobId.toString())

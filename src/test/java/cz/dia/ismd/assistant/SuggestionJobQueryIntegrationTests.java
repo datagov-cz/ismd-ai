@@ -59,7 +59,7 @@ class SuggestionJobQueryIntegrationTests extends AssistantIntegrationTest {
         UUID secondClassJobId = UUID.fromString(Json.read(secondClassStart, "job_id"));
         UUID propertyJobId = UUID.fromString(Json.read(propertyStart, "job_id"));
         UUID relationshipJobId = UUID.fromString(Json.read(relationshipStart, "job_id"));
-        waitForAsyncJob();
+        waitForAsyncJob(firstClassJobId, secondClassJobId, propertyJobId, relationshipJobId);
 
         mockMvc.perform(get("/legal-acts/class-suggestions-jobs")
                         .queryParam("jobIds", firstClassJobId.toString(), secondClassJobId.toString())

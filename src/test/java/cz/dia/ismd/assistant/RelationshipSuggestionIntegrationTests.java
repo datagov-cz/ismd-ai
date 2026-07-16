@@ -33,7 +33,7 @@ class RelationshipSuggestionIntegrationTests extends AssistantIntegrationTest {
                 .andReturn();
 
         UUID jobId = UUID.fromString(Json.read(start, "job_id"));
-        waitForAsyncJob();
+        waitForAsyncJob(jobId);
 
         mockMvc.perform(get("/legal-acts/relationship-suggestions-jobs")
                         .queryParam("jobIds", jobId.toString())
