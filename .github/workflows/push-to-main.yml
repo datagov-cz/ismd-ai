@@ -1,0 +1,127 @@
+name: Build Docker on Main
+
+concurrency:
+  group: build-main
+  cancel-in-progress: false
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**/README.md'
+      - '**/.gitignore'
+      - '**/*.md'
+      - '**/LICENCE.md'
+      - '**/.idea/**'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # Create Git tag for the release
+  create-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.determine-version.outputs.version }}
+      should_build: ${{ steps.determine-version.outputs.should_build }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Determine version and create tag
+        id: determine-version
+        run: |
+          # Release when the merge commit message contains "Release vX.Y.Z"
+          PR_TITLE="${{ github.event.head_commit.message }}"
+
+          if [[ "$PR_TITLE" =~ Release\ v([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+            VERSION="${BASH_REMATCH[1]}"
+            echo "Detected release version: $VERSION"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "should_build=true" >> $GITHUB_OUTPUT
+
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+
+            TAG_NAME="v$VERSION"
+            if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+              echo "Tag $TAG_NAME already exists locally, skipping creation"
+            elif git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
+              echo "Tag $TAG_NAME already exists remotely, fetching it"
+              git fetch origin "refs/tags/$TAG_NAME:refs/tags/$TAG_NAME"
+            else
+              echo "Creating new tag $TAG_NAME"
+              git tag "$TAG_NAME"
+              git push origin "$TAG_NAME"
+              echo "Created and pushed tag $TAG_NAME"
+            fi
+          else
+            echo "Not a release commit, skipping tag creation"
+            echo "should_build=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Build Docker image for main branch (publishes ghcr.io/datagov-cz/ismd-ai)
+  build-docker:
+    needs: create-tag
+    if: needs.create-tag.outputs.should_build == 'true'
+    uses: ./.github/workflows/reusable-docker-build.yml
+    with:
+      branch: main
+      version: ${{ needs.create-tag.outputs.version }}
+    secrets: inherit
+
+  # Sync dev with main after the release build
+  sync-dev:
+    needs: [create-tag, build-docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin git@github.com:${{ github.repository }}.git
+
+      - name: Create sync PR from main to dev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git fetch origin main
+          git fetch origin dev
+
+          VERSION="${{ needs.create-tag.outputs.version }}"
+          SYNC_BRANCH="sync-main-to-dev-v${VERSION}"
+
+          echo "Creating sync branch $SYNC_BRANCH from main..."
+          git checkout -b $SYNC_BRANCH origin/main
+          git push origin $SYNC_BRANCH
+
+          PR_EXISTS=$(gh pr list --head $SYNC_BRANCH --base dev --json number --jq 'length')
+
+          if [ "$PR_EXISTS" = "0" ]; then
+            echo "Creating PR to sync main into dev..."
+            gh pr create \
+              --title "Sync main to dev after release v$VERSION" \
+              --body "Automated sync of main → dev after the v$VERSION release. Merge if there are no conflicts; resolve manually otherwise." \
+              --base dev \
+              --head $SYNC_BRANCH
+            echo "Created sync PR from main to dev"
+          else
+            echo "Sync PR already exists, skipping creation"
+          fi

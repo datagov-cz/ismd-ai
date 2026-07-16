@@ -1,0 +1,75 @@
+name: Reusable Test Workflow
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      # The DB integration tests are annotated @Testcontainers(disabledWithoutDocker = true),
+      # so without a reachable Docker daemon they SKIP instead of failing — a green run
+      # that tested nothing. This is why tests cannot run inside the image build
+      # (`mvn package` in the Dockerfile has no daemon). Fail loudly here instead.
+      - name: Verify Docker is available (Testcontainers)
+        run: |
+          if ! docker info >/dev/null 2>&1; then
+            echo "ERROR: Docker daemon unavailable — Testcontainers tests would silently skip." >&2
+            exit 1
+          fi
+          echo "Docker available: $(docker version --format '{{.Server.Version}}')"
+
+      - name: Run tests
+        run: mvn -B test
+
+      # Guard against the skip re-appearing for any other reason (e.g. a container
+      # image pull failure): surface skipped tests and fail the job.
+      - name: Assert no tests were skipped
+        if: always()
+        run: |
+          shopt -s nullglob
+          REPORTS=(target/surefire-reports/TEST-*.xml)
+          if [ ${#REPORTS[@]} -eq 0 ]; then
+            echo "ERROR: no surefire reports found — tests did not run." >&2
+            exit 1
+          fi
+
+          SKIPPED=$(grep -ho 'skipped="[0-9]*"' "${REPORTS[@]}" \
+            | sed 's/[^0-9]//g' | awk '{s+=$1} END {print s+0}')
+          TOTAL=$(grep -ho 'tests="[0-9]*"' "${REPORTS[@]}" \
+            | sed 's/[^0-9]//g' | awk '{s+=$1} END {print s+0}')
+
+          echo "Tests run: ${TOTAL}, skipped: ${SKIPPED}"
+          if [ "${SKIPPED}" -gt 0 ]; then
+            echo "ERROR: ${SKIPPED} test(s) skipped — expected all to execute." >&2
+            exit 1
+          fi
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ismd-ai-surefire-reports-${{ github.run_id }}
+          path: target/surefire-reports
+          if-no-files-found: warn
