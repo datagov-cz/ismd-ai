@@ -22,7 +22,13 @@ class PropertySuggestionIntegrationTests extends AssistantIntegrationTest {
                         .content("""
                                 {
                                   "k": 1,
-                                  "selected_class_id": "class_001"
+                                  "selected_class_id": "class_001",
+                                  "structural_element_ids": ["/eli/cz/sb/2024/1/2024-01-01/par_1"],
+                                  "known_conceptual_model": {
+                                    "classes": [{"termID": "class_001", "name": {"cs": "Osoba"}}],
+                                    "attributes": [],
+                                    "relationships": []
+                                  }
                                 }
                                 """))
                 .andExpect(status().isAccepted())
@@ -53,5 +59,24 @@ class PropertySuggestionIntegrationTests extends AssistantIntegrationTest {
                                 """))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.detail").exists());
+    }
+
+    @Test
+    void rejectsPropertyJobWhenSelectedClassIsNotInKnownConceptualModel() throws Exception {
+        mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/property-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "selected_class_id": "missing",
+                                  "known_conceptual_model": {
+                                    "classes": [{"termID": "class_001"}],
+                                    "attributes": [],
+                                    "relationships": []
+                                  }
+                                }
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("termID")));
     }
 }

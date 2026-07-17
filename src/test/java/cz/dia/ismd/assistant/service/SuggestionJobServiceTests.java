@@ -1,12 +1,19 @@
 package cz.dia.ismd.assistant.service;
 
 import cz.dia.ismd.assistant.api.suggestion.classsuggestion.ClassSuggestionJobRequest;
+import cz.dia.ismd.assistant.api.suggestion.attribute.PropertySuggestionJobRequest;
+import cz.dia.ismd.assistant.api.suggestion.relationship.RelationshipSuggestionJobRequest;
 import cz.dia.ismd.assistant.model.job.JobStatus;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.model.legal.LegalActText;
 import cz.dia.ismd.assistant.model.suggestion.LangString;
 import cz.dia.ismd.assistant.model.suggestion.TermType;
+import cz.dia.ismd.assistant.model.suggestion.IdReference;
+import cz.dia.ismd.assistant.model.suggestion.KnownConceptualModel;
+import cz.dia.ismd.assistant.model.suggestion.attribute.AttributeSuggestion;
 import cz.dia.ismd.assistant.model.suggestion.classsuggestion.ClassSuggestion;
+import cz.dia.ismd.assistant.model.suggestion.classsuggestion.KnownClassTerm;
+import cz.dia.ismd.assistant.model.suggestion.relationship.RelationshipSuggestion;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.system.CapturedOutput;
@@ -24,13 +31,16 @@ import static org.mockito.Mockito.when;
 @ExtendWith(OutputCaptureExtension.class)
 class SuggestionJobServiceTests {
 
-    private final SuggestionGenerator suggestionGenerator = mock(SuggestionGenerator.class);
     private final ClassSuggestionLlmService classSuggestionLlmService = mock(ClassSuggestionLlmService.class);
+    private final PropertySuggestionLlmService propertySuggestionLlmService = mock(PropertySuggestionLlmService.class);
+    private final RelationshipSuggestionLlmService relationshipSuggestionLlmService =
+            mock(RelationshipSuggestionLlmService.class);
     private final LegalActSPARQLService legalActSPARQLService = mock(LegalActSPARQLService.class);
     private final TokenUsageService tokenUsageService = mock(TokenUsageService.class);
     private final SuggestionJobService service = new SuggestionJobService(
-            suggestionGenerator,
             classSuggestionLlmService,
+            propertySuggestionLlmService,
+            relationshipSuggestionLlmService,
             legalActSPARQLService,
             tokenUsageService
     );
@@ -125,6 +135,67 @@ class SuggestionJobServiceTests {
                 .contains("Suggestion job failed")
                 .contains("No legal texts were found for the requested structural elements");
         verifyNoInteractions(classSuggestionLlmService);
+    }
+
+    @Test
+    void completesPropertyJobWithRetrievedLegalTextAndLlmSuggestions() throws Exception {
+        String structuralElementId = "/eli/cz/sb/2024/1/2024-01-01/par_1";
+        PropertySuggestionJobRequest request = new PropertySuggestionJobRequest(
+                1, "class_001", List.of(structuralElementId), null, knownConceptualModel());
+        LegalActText legalActText = legalActText("2024/1/2024-01-01/par_1", "Osoba má jméno.");
+        AttributeSuggestion suggestion = new AttributeSuggestion(
+                "property_001", new IdReference("class_001"), LangString.cs("jméno"),
+                LangString.cs("Jméno osoby."), LangString.cs("Nalezeno v textu."), "/eli/cz/sb/2024/1");
+        when(legalActSPARQLService.retrieveLegalActTexts(List.of(structuralElementId)))
+                .thenReturn(List.of(legalActText));
+        when(propertySuggestionLlmService.suggestProperties("test-user", request, List.of(legalActText)))
+                .thenReturn(List.of(suggestion));
+
+        SuggestionJob job = service.startPropertyJob("test-user", request);
+
+        awaitFinished(job);
+        assertThat(job.status()).isEqualTo(JobStatus.COMPLETED);
+        assertThat(job.attributeSuggestions()).containsExactly(suggestion);
+        verify(tokenUsageService).ensureRequestAllowed("test-user");
+        verify(propertySuggestionLlmService).suggestProperties("test-user", request, List.of(legalActText));
+    }
+
+    @Test
+    void completesRelationshipJobWithRetrievedLegalTextAndLlmSuggestions() throws Exception {
+        String structuralElementId = "/eli/cz/sb/2024/1/2024-01-01/par_1";
+        RelationshipSuggestionJobRequest request = new RelationshipSuggestionJobRequest(
+                1, "class_001", List.of(structuralElementId), null, knownConceptualModel());
+        LegalActText legalActText = legalActText("2024/1/2024-01-01/par_1", "Osoba vlastní věc.");
+        RelationshipSuggestion suggestion = new RelationshipSuggestion(
+                "relationship_001", new IdReference("class_001"), new IdReference("class_002"),
+                LangString.cs("vlastní"), LangString.cs("Vztah vlastnictví."),
+                LangString.cs("Nalezeno v textu."), "/eli/cz/sb/2024/1");
+        when(legalActSPARQLService.retrieveLegalActTexts(List.of(structuralElementId)))
+                .thenReturn(List.of(legalActText));
+        when(relationshipSuggestionLlmService.suggestRelationships("test-user", request, List.of(legalActText)))
+                .thenReturn(List.of(suggestion));
+
+        SuggestionJob job = service.startRelationshipJob("test-user", request);
+
+        awaitFinished(job);
+        assertThat(job.status()).isEqualTo(JobStatus.COMPLETED);
+        assertThat(job.relationshipSuggestions()).containsExactly(suggestion);
+        verify(tokenUsageService).ensureRequestAllowed("test-user");
+        verify(relationshipSuggestionLlmService).suggestRelationships(
+                "test-user", request, List.of(legalActText));
+    }
+
+    private KnownConceptualModel knownConceptualModel() {
+        return new KnownConceptualModel(
+                List.of(
+                        new KnownClassTerm("class_001", LangString.cs("Osoba"), null, null,
+                                TermType.CLASS, List.of(), "/eli/cz/sb/2024/1"),
+                        new KnownClassTerm("class_002", LangString.cs("Věc"), null, null,
+                                TermType.CLASS, List.of(), "/eli/cz/sb/2024/1")
+                ),
+                List.of(),
+                List.of()
+        );
     }
 
     private LegalActText legalActText(String path, String text) {

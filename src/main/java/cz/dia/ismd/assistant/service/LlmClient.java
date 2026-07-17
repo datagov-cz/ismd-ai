@@ -28,11 +28,6 @@ import java.util.Set;
 public class LlmClient {
 
     private static final String DEFAULT_SYSTEM_PROMPT = "You are a concise assistant.";
-    private static final String CLOSED_WORLD_INSTRUCTION = """
-            Work only with information explicitly included in this request. Do not use the internet, web search,
-            external tools, retrieval systems, URLs, files, or unstated background knowledge. If the supplied data
-            does not support an answer, report or return no result instead of filling gaps from outside knowledge.
-            """;
     private static final String ANTHROPIC_VERSION = "2023-06-01";
     private static final Set<ReasoningEffort> AZURE_REASONING_EFFORTS = EnumSet.of(
             ReasoningEffort.NONE, ReasoningEffort.MINIMAL, ReasoningEffort.LOW,
@@ -611,7 +606,7 @@ public class LlmClient {
         String configuredPrompt = request.systemPrompt() == null || request.systemPrompt().isBlank()
                 ? DEFAULT_SYSTEM_PROMPT
                 : request.systemPrompt();
-        return configuredPrompt + "\n\n" + CLOSED_WORLD_INSTRUCTION;
+        return configuredPrompt + "\n\n" + LlmRequestSupport.CLOSED_WORLD_INSTRUCTION;
     }
 
     private int maxTokens(LlmCompletionRequest request) {

@@ -44,7 +44,10 @@ public class ApiExceptionHandler {
         String detail = exception.getBindingResult().getFieldErrors().stream()
                 .findFirst()
                 .map(error -> error.getField() + " " + error.getDefaultMessage())
-                .orElse("Invalid request data");
+                .orElseGet(() -> exception.getBindingResult().getGlobalErrors().stream()
+                        .findFirst()
+                        .map(error -> error.getDefaultMessage())
+                        .orElse("Invalid request data"));
         return ResponseEntity.unprocessableEntity().body(new ErrorResponse(detail));
     }
 }

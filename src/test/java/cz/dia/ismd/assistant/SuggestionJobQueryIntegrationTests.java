@@ -48,7 +48,15 @@ class SuggestionJobQueryIntegrationTests extends AssistantIntegrationTest {
                         .content("""
                                 {
                                   "k": 1,
-                                  "selected_class_id": "class_001"
+                                  "selected_class_id": "class_001",
+                                  "structural_element_ids": [
+                                    "https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1/hlava_1/par_3"
+                                  ],
+                                  "known_conceptual_model": {
+                                    "classes": [{"termID": "class_001"}],
+                                    "attributes": [],
+                                    "relationships": []
+                                  }
                                 }
                                 """))
                 .andExpect(status().isAccepted())
@@ -59,7 +67,15 @@ class SuggestionJobQueryIntegrationTests extends AssistantIntegrationTest {
                         .content("""
                                 {
                                   "k": 1,
-                                  "selected_class_id": "class_001"
+                                  "selected_class_id": "class_001",
+                                  "structural_element_ids": [
+                                    "https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1/hlava_1/par_3"
+                                  ],
+                                  "known_conceptual_model": {
+                                    "classes": [{"termID": "class_001"}],
+                                    "attributes": [],
+                                    "relationships": []
+                                  }
                                 }
                                 """))
                 .andExpect(status().isAccepted())

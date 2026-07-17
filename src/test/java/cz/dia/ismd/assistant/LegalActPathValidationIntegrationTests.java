@@ -24,7 +24,12 @@ class LegalActPathValidationIntegrationTests extends AssistantIntegrationTest {
                         .content("""
                                 {
                                   "k": 1,
-                                  "selected_class_id": "class_001"
+                                  "selected_class_id": "class_001",
+                                  "known_conceptual_model": {
+                                    "classes": [{"termID": "class_001"}],
+                                    "attributes": [],
+                                    "relationships": []
+                                  }
                                 }
                                 """))
                 .andExpect(status().isAccepted());
@@ -35,7 +40,12 @@ class LegalActPathValidationIntegrationTests extends AssistantIntegrationTest {
                         .content("""
                                 {
                                   "k": 1,
-                                  "selected_class_id": "class_001"
+                                  "selected_class_id": "class_001",
+                                  "known_conceptual_model": {
+                                    "classes": [{"termID": "class_001"}],
+                                    "attributes": [],
+                                    "relationships": []
+                                  }
                                 }
                                 """))
                 .andExpect(status().isAccepted());

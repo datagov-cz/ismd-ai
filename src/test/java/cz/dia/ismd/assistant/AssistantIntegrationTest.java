@@ -1,11 +1,15 @@
 package cz.dia.ismd.assistant;
 
 import cz.dia.ismd.assistant.api.suggestion.classsuggestion.ClassSuggestionJobRequest;
+import cz.dia.ismd.assistant.api.suggestion.attribute.PropertySuggestionJobRequest;
+import cz.dia.ismd.assistant.api.suggestion.relationship.RelationshipSuggestionJobRequest;
 import cz.dia.ismd.assistant.model.job.JobStatus;
 import cz.dia.ismd.assistant.model.legal.LegalActText;
 import cz.dia.ismd.assistant.model.suggestion.DocumentContext;
 import cz.dia.ismd.assistant.service.ClassSuggestionLlmService;
 import cz.dia.ismd.assistant.service.LegalActSPARQLService;
+import cz.dia.ismd.assistant.service.PropertySuggestionLlmService;
+import cz.dia.ismd.assistant.service.RelationshipSuggestionLlmService;
 import cz.dia.ismd.assistant.service.SuggestionGenerator;
 import cz.dia.ismd.assistant.service.SuggestionJobService;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +65,12 @@ abstract class AssistantIntegrationTest {
     protected ClassSuggestionLlmService classSuggestionLlmService;
 
     @MockBean
+    protected PropertySuggestionLlmService propertySuggestionLlmService;
+
+    @MockBean
+    protected RelationshipSuggestionLlmService relationshipSuggestionLlmService;
+
+    @MockBean
     protected LegalActSPARQLService legalActSPARQLService;
 
     @BeforeEach
@@ -75,6 +85,18 @@ abstract class AssistantIntegrationTest {
         when(classSuggestionLlmService.suggestClasses(
                 anyString(), any(ClassSuggestionJobRequest.class), any()))
                 .thenAnswer(invocation -> generator.classSuggestions(
+                        DocumentContext.legal(2024, 1, java.time.LocalDate.of(2024, 1, 1)),
+                        invocation.getArgument(1)
+                ));
+        when(propertySuggestionLlmService.suggestProperties(
+                anyString(), any(PropertySuggestionJobRequest.class), any()))
+                .thenAnswer(invocation -> generator.attributeSuggestions(
+                        DocumentContext.legal(2024, 1, java.time.LocalDate.of(2024, 1, 1)),
+                        invocation.getArgument(1)
+                ));
+        when(relationshipSuggestionLlmService.suggestRelationships(
+                anyString(), any(RelationshipSuggestionJobRequest.class), any()))
+                .thenAnswer(invocation -> generator.relationshipSuggestions(
                         DocumentContext.legal(2024, 1, java.time.LocalDate.of(2024, 1, 1)),
                         invocation.getArgument(1)
                 ));

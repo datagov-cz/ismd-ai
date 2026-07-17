@@ -4,7 +4,6 @@ import cz.dia.ismd.assistant.api.DevelopmentApiResponses;
 import cz.dia.ismd.assistant.api.job.JobStartResponse;
 import cz.dia.ismd.assistant.model.job.JobStatus;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
-import cz.dia.ismd.assistant.model.suggestion.DocumentContext;
 import cz.dia.ismd.assistant.config.ApiEnvironment;
 import cz.dia.ismd.assistant.service.SuggestionJobService;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -53,7 +52,7 @@ public class PropertySuggestionController implements PropertySuggestionApi {
         if (apiEnvironment.isDevelopment()) {
             return developmentApiResponses.startPropertySuggestions();
         }
-        SuggestionJob job = suggestionJobService.startPropertyJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
+        SuggestionJob job = suggestionJobService.startPropertyJob(jwt.getSubject(), request);
         return new JobStartResponse(job.jobId(), JobStatus.IN_PROGRESS);
     }
 

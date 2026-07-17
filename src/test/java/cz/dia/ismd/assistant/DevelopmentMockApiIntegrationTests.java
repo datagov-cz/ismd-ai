@@ -61,7 +61,12 @@ class DevelopmentMockApiIntegrationTests extends AssistantIntegrationTest {
                         .content("""
                                 {
                                   "k": 2,
-                                  "selected_class_id": "request-class-that-is-ignored"
+                                  "selected_class_id": "request-class-that-is-ignored",
+                                  "known_conceptual_model": {
+                                    "classes": [{"termID": "request-class-that-is-ignored"}],
+                                    "attributes": [],
+                                    "relationships": []
+                                  }
                                 }
                                 """))
                 .andExpect(status().isAccepted())
@@ -86,7 +91,12 @@ class DevelopmentMockApiIntegrationTests extends AssistantIntegrationTest {
                         .content("""
                                 {
                                   "k": 2,
-                                  "selected_class_id": "request-class-that-is-ignored"
+                                  "selected_class_id": "request-class-that-is-ignored",
+                                  "known_conceptual_model": {
+                                    "classes": [{"termID": "request-class-that-is-ignored"}],
+                                    "attributes": [],
+                                    "relationships": []
+                                  }
                                 }
                                 """))
                 .andExpect(status().isAccepted())

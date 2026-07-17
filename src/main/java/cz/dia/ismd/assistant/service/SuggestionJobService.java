@@ -6,7 +6,6 @@ import cz.dia.ismd.assistant.api.suggestion.relationship.RelationshipSuggestionJ
 import cz.dia.ismd.assistant.model.job.JobKind;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.model.legal.LegalActText;
-import cz.dia.ismd.assistant.model.suggestion.DocumentContext;
 import cz.dia.ismd.assistant.exception.JobNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,20 +27,23 @@ public class SuggestionJobService {
     private static final Logger log = LoggerFactory.getLogger(SuggestionJobService.class);
     private static final String ELI_PATH_PREFIX = "/eli/cz/sb/";
 
-    private final SuggestionGenerator suggestionGenerator;
     private final ClassSuggestionLlmService classSuggestionLlmService;
+    private final PropertySuggestionLlmService propertySuggestionLlmService;
+    private final RelationshipSuggestionLlmService relationshipSuggestionLlmService;
     private final LegalActSPARQLService legalActSPARQLService;
     private final TokenUsageService tokenUsageService;
     private final Map<UUID, SuggestionJob> jobs = new ConcurrentHashMap<>();
 
     public SuggestionJobService(
-            SuggestionGenerator suggestionGenerator,
             ClassSuggestionLlmService classSuggestionLlmService,
+            PropertySuggestionLlmService propertySuggestionLlmService,
+            RelationshipSuggestionLlmService relationshipSuggestionLlmService,
             LegalActSPARQLService legalActSPARQLService,
             TokenUsageService tokenUsageService
     ) {
-        this.suggestionGenerator = suggestionGenerator;
         this.classSuggestionLlmService = classSuggestionLlmService;
+        this.propertySuggestionLlmService = propertySuggestionLlmService;
+        this.relationshipSuggestionLlmService = relationshipSuggestionLlmService;
         this.legalActSPARQLService = legalActSPARQLService;
         this.tokenUsageService = tokenUsageService;
     }
@@ -60,12 +62,13 @@ public class SuggestionJobService {
         return job;
     }
 
-    public SuggestionJob startPropertyJob(String userId, DocumentContext context, PropertySuggestionJobRequest request) {
+    public SuggestionJob startPropertyJob(String userId, PropertySuggestionJobRequest request) {
         tokenUsageService.ensureRequestAllowed(userId);
         SuggestionJob job = createJob(JobKind.PROPERTY, request.selectedClassId());
         CompletableFuture.runAsync(() -> {
             try {
-                job.completeAttributes(suggestionGenerator.attributeSuggestions(context, request));
+                List<LegalActText> legalActTexts = retrieveLegalActTexts(job, request.structuralElementIds());
+                job.completeAttributes(propertySuggestionLlmService.suggestProperties(userId, request, legalActTexts));
             } catch (RuntimeException exception) {
                 failJob(job, exception);
             }
@@ -73,12 +76,14 @@ public class SuggestionJobService {
         return job;
     }
 
-    public SuggestionJob startRelationshipJob(String userId, DocumentContext context, RelationshipSuggestionJobRequest request) {
+    public SuggestionJob startRelationshipJob(String userId, RelationshipSuggestionJobRequest request) {
         tokenUsageService.ensureRequestAllowed(userId);
         SuggestionJob job = createJob(JobKind.RELATIONSHIP, request.selectedClassId());
         CompletableFuture.runAsync(() -> {
             try {
-                job.completeRelationships(suggestionGenerator.relationshipSuggestions(context, request));
+                List<LegalActText> legalActTexts = retrieveLegalActTexts(job, request.structuralElementIds());
+                job.completeRelationships(relationshipSuggestionLlmService.suggestRelationships(
+                        userId, request, legalActTexts));
             } catch (RuntimeException exception) {
                 failJob(job, exception);
             }

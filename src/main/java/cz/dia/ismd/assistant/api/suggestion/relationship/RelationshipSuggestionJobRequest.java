@@ -1,12 +1,15 @@
 package cz.dia.ismd.assistant.api.suggestion.relationship;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import cz.dia.ismd.assistant.model.suggestion.KnownConceptualModel;
 import cz.dia.ismd.assistant.model.suggestion.ValidationPatterns;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
 import java.util.List;
@@ -21,9 +24,20 @@ public record RelationshipSuggestionJobRequest(
         @Schema(description = "Plain-language user context used to guide relationship suggestion generation (optional, currently unused).")
         String contextText,
         @Schema(description = "Known conceptual model terms that the generated relationship suggestions should take into account.")
-        @Valid KnownConceptualModel knownConceptualModel
+        @NotNull @Valid KnownConceptualModel knownConceptualModel
 ) {
     public int effectiveK() {
         return k == null ? 5 : k;
+    }
+
+    @JsonIgnore
+    @AssertTrue(message = "knownConceptualModel must be non-empty and contain selectedClassId as a class termID")
+    public boolean isSelectedClassPresentInKnownConceptualModel() {
+        return selectedClassId != null
+                && knownConceptualModel != null
+                && knownConceptualModel.classes() != null
+                && !knownConceptualModel.classes().isEmpty()
+                && knownConceptualModel.classes().stream()
+                .anyMatch(term -> term != null && selectedClassId.equals(term.termID()));
     }
 }

@@ -24,7 +24,15 @@ class RelationshipSuggestionIntegrationTests extends AssistantIntegrationTest {
                                   "k": 2,
                                   "selected_class_id": "class_001",
                                   "structural_element_ids": ["/eli/cz/sb/2024/1/section/1", "/eli/cz/sb/2024/1/section/2"],
-                                  "context_text": "Property rights"
+                                  "context_text": "Property rights",
+                                  "known_conceptual_model": {
+                                    "classes": [
+                                      {"termID": "class_001", "name": {"cs": "Osoba"}},
+                                      {"termID": "class_002", "name": {"cs": "Věc"}}
+                                    ],
+                                    "attributes": [],
+                                    "relationships": []
+                                  }
                                 }
                                 """))
                 .andExpect(status().isAccepted())
@@ -45,5 +53,24 @@ class RelationshipSuggestionIntegrationTests extends AssistantIntegrationTest {
                 .andExpect(jsonPath("$[0].status").value("completed"))
                 .andExpect(jsonPath("$[0].new_relationship_suggestions", hasSize(2)))
                 .andExpect(jsonPath("$[0].new_relationship_suggestions[0].legal_act").value("/eli/cz/sb/2024/1"));
+    }
+
+    @Test
+    void rejectsRelationshipJobWithEmptyKnownConceptualModel() throws Exception {
+        mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/relationship-suggestions-top-k-extraction-jobs")
+                        .with(oidcAuthentication())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "selected_class_id": "class_001",
+                                  "known_conceptual_model": {
+                                    "classes": [],
+                                    "attributes": [],
+                                    "relationships": []
+                                  }
+                                }
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("non-empty")));
     }
 }
