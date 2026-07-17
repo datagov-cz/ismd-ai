@@ -165,15 +165,15 @@ Wait for Keycloak again using step 3 before retrying the token request.
 START_RESPONSE=$(
   curl --proxy '' \
     --resolve localhost:8080:127.0.0.1 \
-    --fail --silent --show-error \
+    --fail-with-body --silent --show-error \
     --request POST \
-    http://localhost:8080/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs \
+    http://localhost:8080/legal-acts/2026/60/2026-05-27/class-suggestions-top-k-extraction-jobs \
     --header "Authorization: Bearer ${ACCESS_TOKEN}" \
     --header "Content-Type: application/json" \
     --data '{
       "k": 1,
       "structural_element_ids": [
-        "/eli/cz/sb/2024/1/section/1"
+        "https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1/hlava_1/par_3"
       ],
       "context_text": "Generate the main conceptual-model class.",
       "known_conceptual_model": {
@@ -187,6 +187,10 @@ START_RESPONSE=$(
 echo "$START_RESPONSE" | jq
 JOB_ID=$(echo "$START_RESPONSE" | jq --raw-output '.job_id')
 ```
+
+`--fail-with-body` keeps the API's validation detail visible if this request is
+rejected. For example, an invalid `structural_element_ids` value is returned as
+an HTTP `422` response with a JSON `detail` field.
 
 An accepted request returns HTTP `202` with a response similar to:
 
@@ -221,7 +225,7 @@ curl --proxy '' \
   --resolve localhost:8080:127.0.0.1 \
   --output /dev/null --silent --write-out '%{http_code}\n' \
   --request POST \
-  http://localhost:8080/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs \
+  http://localhost:8080/legal-acts/2026/60/2026-05-27/class-suggestions-top-k-extraction-jobs \
   --header "Content-Type: application/json" \
   --data '{"k":1}'
 ```

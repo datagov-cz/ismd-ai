@@ -90,6 +90,17 @@ class LegalActSPARQLServiceTests {
         verify(queryExecutor).evaluateTupleQuery(any(), contentQuery.capture());
         assertThat(contentQuery.getValue()).contains("VALUES ?predek {", "<" + NAMESPACE + ELI_PATH + ">");
 
+        ArgumentCaptor<String> nameQuery = ArgumentCaptor.forClass(String.class);
+        verify(queryExecutor).evaluateTupleQuery(any(), nameQuery.capture(), any());
+        assertThat(nameQuery.getValue())
+                .contains(
+                        "esel:má-typ-fragmentu ?title_type",
+                        "STRSTARTS(",
+                        "https://opendata.eselpoint.gov.cz/esel-esb/cis-esb-typ-fragmentu/",
+                        "STRENDS(STR(?title_type), \"/Prefix_Title\")"
+                )
+                .doesNotContain("/položka/");
+
         ArgumentCaptor<LegalAct> legalAct = ArgumentCaptor.forClass(LegalAct.class);
         verify(legalActService).create(legalAct.capture());
         assertThat(legalAct.getValue()).usingRecursiveComparison().isEqualTo(new LegalAct(
@@ -112,6 +123,25 @@ class LegalActSPARQLServiceTests {
 
         assertThat(service.retrieveLegalActTexts(List.of(
                 "https://another-website.test/eli/cz/sb/" + ELI_PATH
+        ))).containsExactly(cached);
+        verify(queryExecutor, never()).query(anyString(), any());
+    }
+
+    @Test
+    void parsesEliSuffixAfterAnOpaquePrefix() {
+        SparqlQueryExecutor queryExecutor = mock(SparqlQueryExecutor.class);
+        Environment environment = mock(Environment.class);
+        LegalActService legalActService = mock(LegalActService.class);
+        LegalActTextService legalActTextService = mock(LegalActTextService.class);
+        LegalActText cached = new LegalActText(1L, 2L, ELI_PATH, "Cached", "paragraph", "1");
+        when(legalActTextService.findByPathPrefix(ELI_PATH)).thenReturn(List.of(cached));
+
+        LegalActSPARQLService service = new LegalActSPARQLService(
+                queryExecutor, environment, legalActService, legalActTextService
+        );
+
+        assertThat(service.retrieveLegalActTexts(List.of(
+                "arbitrary prefix with spaces /eli/cz/sb/" + ELI_PATH
         ))).containsExactly(cached);
         verify(queryExecutor, never()).query(anyString(), any());
     }

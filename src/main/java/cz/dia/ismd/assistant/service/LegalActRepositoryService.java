@@ -47,7 +47,7 @@ public class LegalActRepositoryService {
     }
 
     public JsonNode fetchJson(String sparqlQuery) {
-        return sparqlQueryExecutor.execute("legal act repository query", () -> {
+        return sparqlQueryExecutor.executeQuery("legal act repository query", sparqlQuery, () -> {
             MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
             formData.add("query", sparqlQuery);
 

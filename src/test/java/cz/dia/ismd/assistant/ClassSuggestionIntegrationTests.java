@@ -1,5 +1,6 @@
 package cz.dia.ismd.assistant;
 
+import cz.dia.ismd.assistant.api.suggestion.classsuggestion.ClassSuggestionJobRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
@@ -7,6 +8,9 @@ import org.springframework.test.web.servlet.MvcResult;
 import java.util.UUID;
 
 import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -22,7 +26,7 @@ class ClassSuggestionIntegrationTests extends AssistantIntegrationTest {
                         .content("""
                                 {
                                   "k": 2,
-                                  "structural_element_ids": ["/eli/cz/sb/2024/1/section/1", "/eli/cz/sb/2024/1/section/2"],
+                                  "structural_element_ids": ["https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1/hlava_1/par_3", "https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1/hlava_1/par_4"],
                                   "context_text": "Property rights",
                                   "known_conceptual_model": {
                                     "classes": [
@@ -47,6 +51,8 @@ class ClassSuggestionIntegrationTests extends AssistantIntegrationTest {
 
         UUID jobId = UUID.fromString(Json.read(start, "job_id"));
         waitForAsyncJob(jobId);
+        verify(classSuggestionLlmService).suggestClasses(
+                eq("test-user"), any(ClassSuggestionJobRequest.class), any());
 
         mockMvc.perform(get("/legal-acts/class-suggestions-jobs")
                         .queryParam("jobIds", jobId.toString())

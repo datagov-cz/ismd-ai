@@ -1,10 +1,18 @@
 package cz.dia.ismd.assistant;
 
+import cz.dia.ismd.assistant.api.suggestion.classsuggestion.ClassSuggestionJobRequest;
 import cz.dia.ismd.assistant.model.job.JobStatus;
+import cz.dia.ismd.assistant.model.legal.LegalActText;
+import cz.dia.ismd.assistant.model.suggestion.DocumentContext;
+import cz.dia.ismd.assistant.service.ClassSuggestionLlmService;
+import cz.dia.ismd.assistant.service.LegalActSPARQLService;
+import cz.dia.ismd.assistant.service.SuggestionGenerator;
 import cz.dia.ismd.assistant.service.SuggestionJobService;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -17,8 +25,12 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.util.UUID;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 
 @SpringBootTest(
@@ -44,6 +56,29 @@ abstract class AssistantIntegrationTest {
 
     @Autowired
     private SuggestionJobService suggestionJobService;
+
+    @MockBean
+    protected ClassSuggestionLlmService classSuggestionLlmService;
+
+    @MockBean
+    protected LegalActSPARQLService legalActSPARQLService;
+
+    @BeforeEach
+    void configureClassSuggestionLlmService() {
+        SuggestionGenerator generator = new SuggestionGenerator();
+        when(legalActSPARQLService.retrieveLegalActTexts(any()))
+                .thenAnswer(invocation -> ((List<String>) invocation.getArgument(0)).stream()
+                        .map(identifier -> new LegalActText(
+                                1L, 1L, identifier.substring(identifier.indexOf("/eli/cz/sb/") + 11),
+                                "Legal text", "paragraph", "1"))
+                        .toList());
+        when(classSuggestionLlmService.suggestClasses(
+                anyString(), any(ClassSuggestionJobRequest.class), any()))
+                .thenAnswer(invocation -> generator.classSuggestions(
+                        DocumentContext.legal(2024, 1, java.time.LocalDate.of(2024, 1, 1)),
+                        invocation.getArgument(1)
+                ));
+    }
 
     @DynamicPropertySource
     static void postgresProperties(DynamicPropertyRegistry registry) {

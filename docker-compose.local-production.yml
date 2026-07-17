@@ -6,6 +6,7 @@ services:
     ports:
       - "8080:8080"
     environment:
+      LOGGING_LEVEL_ROOT: DEBUG    
       APP_ENVIRONMENT: production
       OIDC_ISSUER_URI: http://localhost:8081/realms/ismd
       OIDC_JWK_SET_URI: http://keycloak:8080/realms/ismd/protocol/openid-connect/certs

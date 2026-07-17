@@ -8,6 +8,8 @@ import org.eclipse.rdf4j.query.TupleQuery;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
 import org.eclipse.rdf4j.repository.sparql.SPARQLRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
@@ -26,6 +28,8 @@ import java.util.function.Supplier;
 
 @Service
 public class SparqlQueryExecutor {
+
+    private static final Logger log = LoggerFactory.getLogger(SparqlQueryExecutor.class);
 
     private final SPARQLRepository repository;
     private final URI endpointUrl;
@@ -70,6 +74,13 @@ public class SparqlQueryExecutor {
         throw sparqlAccessException(operation, lastFailure, maxAttempts);
     }
 
+    public <T> T executeQuery(String operation, String sparqlQuery, Supplier<T> sparqlOperation) {
+        return execute(operation, () -> {
+            logQuery(sparqlQuery);
+            return sparqlOperation.get();
+        });
+    }
+
     public TupleQueryResult evaluateTupleQuery(RepositoryConnection connection, String sparqlQuery) {
         return evaluateTupleQuery(connection, sparqlQuery, query -> {
         });
@@ -83,12 +94,20 @@ public class SparqlQueryExecutor {
         TupleQuery query = connection.prepareTupleQuery(sparqlQuery);
         query.setMaxExecutionTime(queryTimeoutSeconds);
         queryCustomizer.accept(query);
+        logQuery(sparqlQuery);
+        if (!query.getBindings().isEmpty()) {
+            log.debug("SPARQL query bindings: {}", query.getBindings());
+        }
         return query.evaluate();
     }
 
     @PreDestroy
     public void close() {
         repository.shutDown();
+    }
+
+    private void logQuery(String sparqlQuery) {
+        log.debug("Sending SPARQL query to {}:\n{}", endpointUrl, sparqlQuery);
     }
 
     private void waitBeforeRetry(String operation, int attempt, RuntimeException exception) {

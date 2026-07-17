@@ -14,7 +14,6 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.URI;
 import java.time.LocalDate;
 import java.time.Year;
 import java.util.ArrayList;
@@ -41,8 +40,16 @@ public class LegalActSPARQLService {
 
                   ?fragment esel:obsahuje-fragment ?fragment_s_nazvem .
 
-                  ?fragment_s_nazvem esel:má-typ-fragmentu <https://opendata.eselpoint.gov.cz/esel-esb/cis-esb-typ-fragmentu/položka/Prefix_Title> ;
+                  ?fragment_s_nazvem esel:má-typ-fragmentu ?title_type ;
                     esel:text-fragmentu ?nazev .
+
+                  FILTER(
+                    STRSTARTS(
+                      STR(?title_type),
+                      "https://opendata.eselpoint.gov.cz/esel-esb/cis-esb-typ-fragmentu/"
+                    )
+                    && STRENDS(STR(?title_type), "/Prefix_Title")
+                  )
               }
             """;
 
@@ -204,10 +211,10 @@ public class LegalActSPARQLService {
     public Optional<LegalAct> retrieveLegalActInfo(String legalActId) {
         ParsedEli parsed = parseEli(legalActId);
         LegalAct legalAct = parsed.toLegalAct();
-        URI actELI = URI.create(eliNamespace() + parsed.legalActPath());
+        String actELI = eliNamespace() + parsed.legalActPath();
         return sparqlQueryExecutor.query("legal act name query", repositoryConnection -> {
             try (TupleQueryResult result = sparqlQueryExecutor.evaluateTupleQuery(repositoryConnection, QUERY_LEGAL_ACT_NAME, tupleQuery ->
-                tupleQuery.setBinding("legal_act_id", SimpleValueFactory.getInstance().createIRI(actELI.toString()))
+                tupleQuery.setBinding("legal_act_id", SimpleValueFactory.getInstance().createIRI(actELI))
             )) {
                 if (result.hasNext()) {
                     BindingSet bindingSet = result.next();
@@ -231,18 +238,11 @@ public class LegalActSPARQLService {
 
     private ParsedEli parseEli(String identifier) {
         Objects.requireNonNull(identifier, "ELI identifier must not be null");
-        URI uri;
-        try {
-            uri = URI.create(identifier);
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("Invalid ELI identifier: " + identifier, exception);
-        }
-        String path = uri.getPath();
-        int prefixIndex = path == null ? -1 : path.indexOf(ELI_PATH_PREFIX);
+        int prefixIndex = identifier.lastIndexOf(ELI_PATH_PREFIX);
         if (prefixIndex < 0) {
             throw new IllegalArgumentException("ELI identifier must contain " + ELI_PATH_PREFIX + ": " + identifier);
         }
-        return parseShortEli(path.substring(prefixIndex + ELI_PATH_PREFIX.length()));
+        return parseShortEli(identifier.substring(prefixIndex + ELI_PATH_PREFIX.length()));
     }
 
     private ParsedEli parseShortEli(String path) {

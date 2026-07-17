@@ -115,7 +115,7 @@ APP_LLM_ENABLED=true
 APP_LLM_PROVIDER=OPENAI
 APP_LLM_MODEL=gpt-4o-mini
 APP_LLM_API_KEY=<provider-api-key>
-APP_LLM_ENDPOINT_URL=https://api.openai.com/v1/chat/completions
+APP_LLM_ENDPOINT_URL=https://api.openai.com/v1/responses
 APP_LLM_MAX_TOKENS=1024
 APP_LLM_TEMPERATURE=0.2
 APP_LLM_REASONING_EFFORT=
@@ -126,18 +126,17 @@ APP_LLM_LOG_INTERACTIONS=false
 
 Supported providers are `OPENAI`, `OPENAI_COMPATIBLE`, `AZURE_OPENAI`,
 `ANTHROPIC`, `GOOGLE`, `MISTRAL`, `COHERE`, and `OLLAMA`. Use
-`APP_LLM_ENDPOINT_URL` to override any default provider endpoint. Azure OpenAI
-and Google Gemini endpoints may include `{model}`, which is replaced with
-`APP_LLM_MODEL`.
+`APP_LLM_ENDPOINT_URL` to override any default provider endpoint. Google Gemini
+endpoints may include `{model}`, which is replaced with `APP_LLM_MODEL`.
 
 Reasoning effort and text verbosity are translated to each provider's native
 request format when supported:
 
 | Provider | Reasoning effort mapping | Text verbosity mapping |
 | --- | --- | --- |
-| `OPENAI` | `reasoning_effort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` | `verbosity`: `low`, `medium`, `high` |
+| `OPENAI` | `reasoning.effort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` | `text.verbosity`: `low`, `medium`, `high` |
 | `OPENAI_COMPATIBLE` | OpenAI-compatible `reasoning_effort` | OpenAI-compatible `verbosity` |
-| `AZURE_OPENAI` | `reasoning_effort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` | `verbosity`: `low`, `medium`, `high` |
+| `AZURE_OPENAI` | `reasoning.effort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` | `text.verbosity`: `low`, `medium`, `high` |
 | `ANTHROPIC` | `output_config.effort`: `low`, `medium`, `high`, `xhigh`, `max` | Not supported separately |
 | `GOOGLE` | `generationConfig.thinkingConfig.thinkingLevel`: `minimal`, `low`, `medium`, `high` | Not supported separately |
 | `MISTRAL` | `reasoning_effort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` | Not supported separately |
@@ -150,11 +149,13 @@ provider-level values. Both settings are omitted when their environment
 variables are empty.
 
 Set `APP_LLM_LOG_INTERACTIONS=true` to ask supported providers to retain API
-requests and responses in their provider-side logs. This currently adds the
-provider's `store` request option for OpenAI, Azure OpenAI, and Google Gemini.
+requests and responses in their provider-side logs. OpenAI and Azure OpenAI
+always receive an explicit `store` value so their Responses APIs remain opt-in;
+Google Gemini receives `store: true` only when logging is enabled.
 Other providers receive no extra request field. Keep this disabled unless the
 sent legal text is permitted to be retained by the configured provider. Azure
-OpenAI endpoints must use an API version that supports stored completions.
+OpenAI custom endpoints must target `/openai/v1/responses` (or a compatible
+Responses API preview endpoint).
 
 ## API Docs
 

@@ -27,7 +27,12 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
                         .with(oidcAuthentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"k": 1}
+                                {
+                                  "k": 1,
+                                  "structural_element_ids": [
+        "https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1/hlava_1/par_3"
+      ]
+                                }
                                 """))
                 .andExpect(status().isAccepted())
                 .andReturn();
@@ -36,7 +41,12 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
                         .with(oidcAuthentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"k": 3}
+                                {
+                                  "k": 3,
+                                  "structural_element_ids": [
+        "https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1/hlava_1/par_3"
+      ]
+                                }
                                 """))
                 .andExpect(status().isAccepted())
                 .andReturn();
@@ -89,7 +99,12 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
                         .with(oidcAuthentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"k": 1}
+                                {
+                                  "k": 1,
+                                  "structural_element_ids": [
+        "https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1/hlava_1/par_3"
+      ]
+                                }
                                 """))
                 .andExpect(status().isAccepted())
                 .andReturn();
@@ -163,7 +178,12 @@ class FeedbackIntegrationTests extends AssistantIntegrationTest {
                         .with(oidcAuthentication())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"k": 1}
+                                {
+                                  "k": 1,
+                                  "structural_element_ids": [
+        "https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1/hlava_1/par_3"
+      ]
+                                }
                                 """))
                 .andExpect(status().isAccepted())
                 .andReturn();

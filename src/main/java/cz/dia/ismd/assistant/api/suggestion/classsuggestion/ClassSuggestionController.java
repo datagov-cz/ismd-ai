@@ -3,7 +3,6 @@ package cz.dia.ismd.assistant.api.suggestion.classsuggestion;
 import cz.dia.ismd.assistant.api.DevelopmentApiResponses;
 import cz.dia.ismd.assistant.api.job.JobStartResponse;
 import cz.dia.ismd.assistant.model.job.JobStatus;
-import cz.dia.ismd.assistant.model.suggestion.DocumentContext;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.config.ApiEnvironment;
 import cz.dia.ismd.assistant.service.SuggestionJobService;
@@ -53,7 +52,7 @@ public class ClassSuggestionController implements ClassSuggestionApi {
         if (apiEnvironment.isDevelopment()) {
             return developmentApiResponses.startClassSuggestions();
         }
-        SuggestionJob job = suggestionJobService.startClassJob(jwt.getSubject(), DocumentContext.legal(year, number, date), request);
+        SuggestionJob job = suggestionJobService.startClassJob(jwt.getSubject(), request);
         return new JobStartResponse(job.jobId(), JobStatus.IN_PROGRESS);
     }
 
