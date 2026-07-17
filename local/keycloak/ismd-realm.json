@@ -1,0 +1,41 @@
+{
+  "realm": "ismd",
+  "enabled": true,
+  "displayName": "ISMD local production-mode testing",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "clients": [
+    {
+      "clientId": "ismd-local",
+      "name": "ISMD local API client",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "client.use.lightweight.access.token.enabled": "false"
+      }
+    }
+  ],
+  "users": [
+    {
+      "username": "local-user",
+      "enabled": true,
+      "firstName": "Local",
+      "lastName": "User",
+      "email": "local-user@example.test",
+      "emailVerified": true,
+      "requiredActions": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "local-password",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

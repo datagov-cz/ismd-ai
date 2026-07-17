@@ -37,6 +37,41 @@ APP_DB_USER=ismd
 APP_DB_PASSWORD=ismd
 ```
 
+### Environment variables
+
+Copy `.env.example` to `.env` for a documented local configuration. The
+defaults below are the application defaults from `application.properties`;
+Docker Compose or `.env.example` may intentionally provide development-specific
+values instead.
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `APP_ENVIRONMENT` | `production` | Runtime mode. `dev` and `development` enable development-only mock endpoints. |
+| `OIDC_ISSUER_URI` | `http://localhost:8081/realms/ismd` | Expected OpenID Connect issuer used to validate bearer JWTs. |
+| `OIDC_JWK_SET_URI` | `http://localhost:8081/realms/ismd/protocol/openid-connect/certs` | Endpoint providing public keys used to verify bearer JWT signatures. |
+| `APP_SPARQL_ENDPOINT_URL` | `https://opendata.eselpoint.gov.cz/sparql` | SPARQL endpoint queried for legal-act data. |
+| `APP_SPARQL_TIMEOUT` | `10s` | Maximum duration of one SPARQL request. |
+| `APP_SPARQL_MAX_ATTEMPTS` | `3` | Total number of attempts for a retryable SPARQL request. |
+| `APP_SPARQL_RETRY_BACKOFF` | `250ms` | Delay between retryable SPARQL request attempts. |
+| `APP_TOKENS_MAX_ALLOWED_PER_DAY` | `1000` | Maximum number of LLM tokens a user may consume per day; `0` denies all usage. |
+| `APP_LLM_ENABLED` | `false` | Enables calls to the configured external LLM provider. |
+| `APP_LLM_PROVIDER` | `OPENAI` | Provider API format. Supported values are listed under LLM Configuration. |
+| `APP_LLM_ENDPOINT_URL` | Provider-specific | Overrides the provider's default endpoint when set. |
+| `APP_LLM_MODEL` | `gpt-4o-mini` | Model identifier sent to the provider and substituted for `{model}` in supported endpoint URLs. |
+| `APP_LLM_API_KEY` | Empty | Credential sent to the provider. Ollama does not require one. |
+| `APP_LLM_MAX_TOKENS` | `1024` | Default maximum number of output tokens requested from the model. |
+| `APP_LLM_TEMPERATURE` | Empty | Optional sampling temperature; when unset, the provider's default is used. |
+| `APP_LLM_REASONING_EFFORT` | Empty | Optional reasoning depth. Supported values depend on the provider and model; see the mapping below. |
+| `APP_LLM_TEXT_VERBOSITY` | Empty | Optional response detail level. OpenAI-style APIs support `low`, `medium`, and `high`. |
+| `APP_LLM_TIMEOUT` | `60s` | Maximum duration of one LLM HTTP request. |
+| `APP_LLM_LOG_INTERACTIONS` | `false` | Requests provider-side interaction retention where supported. Keep disabled for sensitive text. |
+| `APP_DB_HOST` | `localhost` | PostgreSQL server hostname. Docker Compose uses its `postgres` service instead. |
+| `APP_DB_PORT` | `5432` | PostgreSQL server TCP port. |
+| `APP_DB_NAME` | `ismd` | PostgreSQL database name. |
+| `APP_DB_USER` | `ismd` | PostgreSQL login username. |
+| `APP_DB_PASSWORD` | `ismd` | PostgreSQL login password; change it outside local development. |
+| `APP_DB_TIME_ZONE` | `Europe/Prague` | Time zone applied when each database connection is initialized. |
+
 ## SPARQL Access
 
 Use `SparqlQueryExecutor` for services that call the configured SPARQL endpoint.
@@ -83,7 +118,10 @@ APP_LLM_API_KEY=<provider-api-key>
 APP_LLM_ENDPOINT_URL=https://api.openai.com/v1/chat/completions
 APP_LLM_MAX_TOKENS=1024
 APP_LLM_TEMPERATURE=0.2
+APP_LLM_REASONING_EFFORT=
+APP_LLM_TEXT_VERBOSITY=
 APP_LLM_TIMEOUT=60s
+APP_LLM_LOG_INTERACTIONS=false
 ```
 
 Supported providers are `OPENAI`, `OPENAI_COMPATIBLE`, `AZURE_OPENAI`,
@@ -91,6 +129,32 @@ Supported providers are `OPENAI`, `OPENAI_COMPATIBLE`, `AZURE_OPENAI`,
 `APP_LLM_ENDPOINT_URL` to override any default provider endpoint. Azure OpenAI
 and Google Gemini endpoints may include `{model}`, which is replaced with
 `APP_LLM_MODEL`.
+
+Reasoning effort and text verbosity are translated to each provider's native
+request format when supported:
+
+| Provider | Reasoning effort mapping | Text verbosity mapping |
+| --- | --- | --- |
+| `OPENAI` | `reasoning_effort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` | `verbosity`: `low`, `medium`, `high` |
+| `OPENAI_COMPATIBLE` | OpenAI-compatible `reasoning_effort` | OpenAI-compatible `verbosity` |
+| `AZURE_OPENAI` | `reasoning_effort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` | `verbosity`: `low`, `medium`, `high` |
+| `ANTHROPIC` | `output_config.effort`: `low`, `medium`, `high`, `xhigh`, `max` | Not supported separately |
+| `GOOGLE` | `generationConfig.thinkingConfig.thinkingLevel`: `minimal`, `low`, `medium`, `high` | Not supported separately |
+| `MISTRAL` | `reasoning_effort`: `none`, `minimal`, `low`, `medium`, `high`, `xhigh` | Not supported separately |
+| `COHERE` | No categorical effort control; Cohere exposes a separate thinking budget | Not supported separately |
+| `OLLAMA` | `think`: `none`, `low`, `medium`, `high`, `max` | Not supported separately |
+
+The application rejects reasoning values unsupported by the selected provider
+before sending the request. Individual models may support only a subset of the
+provider-level values. Both settings are omitted when their environment
+variables are empty.
+
+Set `APP_LLM_LOG_INTERACTIONS=true` to ask supported providers to retain API
+requests and responses in their provider-side logs. This currently adds the
+provider's `store` request option for OpenAI, Azure OpenAI, and Google Gemini.
+Other providers receive no extra request field. Keep this disabled unless the
+sent legal text is permitted to be retained by the configured provider. Azure
+OpenAI endpoints must use an API version that supports stored completions.
 
 ## API Docs
 
