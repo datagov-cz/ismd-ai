@@ -6,6 +6,9 @@ import cz.dia.ismd.assistant.api.suggestion.relationship.RelationshipSuggestionJ
 import cz.dia.ismd.assistant.model.job.JobKind;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.model.legal.LegalActText;
+import cz.dia.ismd.assistant.model.suggestion.attribute.AttributeSuggestion;
+import cz.dia.ismd.assistant.model.suggestion.classsuggestion.ClassSuggestion;
+import cz.dia.ismd.assistant.model.suggestion.relationship.RelationshipSuggestion;
 import cz.dia.ismd.assistant.exception.JobNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +57,15 @@ public class SuggestionJobService {
         CompletableFuture.runAsync(() -> {
             try {
                 List<LegalActText> legalActTexts = retrieveLegalActTexts(job, request.structuralElementIds());
-                job.completeClasses(classSuggestionLlmService.suggestClasses(userId, request, legalActTexts));
+                StreamingSuggestions<ClassSuggestion> streamed =
+                        classSuggestionLlmService.streamClasses(
+                                userId, request, legalActTexts, job::addClassSuggestion);
+                // Allows existing custom/mock implementations that only implement the buffered method.
+                List<ClassSuggestion> suggestions =
+                        streamed == null
+                                ? classSuggestionLlmService.suggestClasses(userId, request, legalActTexts)
+                                : streamed.suggestions();
+                job.completeClasses(suggestions);
             } catch (RuntimeException exception) {
                 failJob(job, exception);
             }
@@ -68,7 +79,14 @@ public class SuggestionJobService {
         CompletableFuture.runAsync(() -> {
             try {
                 List<LegalActText> legalActTexts = retrieveLegalActTexts(job, request.structuralElementIds());
-                job.completeAttributes(propertySuggestionLlmService.suggestProperties(userId, request, legalActTexts));
+                StreamingSuggestions<AttributeSuggestion> streamed =
+                        propertySuggestionLlmService.streamProperties(
+                                userId, request, legalActTexts, job::addAttributeSuggestion);
+                List<AttributeSuggestion> suggestions =
+                        streamed == null
+                                ? propertySuggestionLlmService.suggestProperties(userId, request, legalActTexts)
+                                : streamed.suggestions();
+                job.completeAttributes(suggestions);
             } catch (RuntimeException exception) {
                 failJob(job, exception);
             }
@@ -82,8 +100,15 @@ public class SuggestionJobService {
         CompletableFuture.runAsync(() -> {
             try {
                 List<LegalActText> legalActTexts = retrieveLegalActTexts(job, request.structuralElementIds());
-                job.completeRelationships(relationshipSuggestionLlmService.suggestRelationships(
-                        userId, request, legalActTexts));
+                StreamingSuggestions<RelationshipSuggestion> streamed =
+                        relationshipSuggestionLlmService.streamRelationships(
+                                userId, request, legalActTexts, job::addRelationshipSuggestion);
+                List<RelationshipSuggestion> suggestions =
+                        streamed == null
+                                ? relationshipSuggestionLlmService.suggestRelationships(
+                                        userId, request, legalActTexts)
+                                : streamed.suggestions();
+                job.completeRelationships(suggestions);
             } catch (RuntimeException exception) {
                 failJob(job, exception);
             }

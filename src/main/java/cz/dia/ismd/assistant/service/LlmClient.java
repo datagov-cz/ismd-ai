@@ -16,6 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -23,6 +26,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 @Service
 public class LlmClient {
@@ -119,6 +123,248 @@ public class LlmClient {
             throw new LlmException("LLM provider returned a response that could not be deserialized as "
                     + responseType.getSimpleName(), exception);
         }
+    }
+
+    /**
+     * Streams a structured response and invokes {@code suggestionConsumer} as soon as each complete suggestion
+     * object has arrived. The method returns only after the provider has sent its terminal completion event.
+     */
+    public <R, T> R completeStructuredStreaming(
+            String userId,
+            LlmCompletionRequest request,
+            String schemaName,
+            JsonNode schema,
+            Class<R> responseType,
+            Class<T> suggestionType,
+            Consumer<T> suggestionConsumer
+    ) {
+        if (!properties.enabled()) {
+            throw new LlmException("LLM integration is disabled. Set APP_LLM_ENABLED=true to enable external LLM calls.");
+        }
+        validateConfiguration();
+        tokenUsageService.ensureRequestAllowed(userId);
+
+        StructuredSuggestionsParser<T> parser =
+                new StructuredSuggestionsParser<>(objectMapper, suggestionType, suggestionConsumer);
+        StreamCompletion completion = postStructuredStream(
+                streamingEndpoint(), request, schemaName, schema, parser::accept);
+        if (!completion.completed()) {
+            throw new LlmException("LLM provider ended the stream before completing the structured response");
+        }
+        tokenUsageService.addOutputTokens(userId, completion.outputTokens());
+        try {
+            return objectMapper.readValue(parser.content(), responseType);
+        } catch (JsonProcessingException exception) {
+            throw new LlmException("LLM provider returned a response that could not be deserialized as "
+                    + responseType.getSimpleName(), exception);
+        }
+    }
+
+    private StreamCompletion postStructuredStream(
+            URI endpoint,
+            LlmCompletionRequest request,
+            String schemaName,
+            JsonNode schema,
+            Consumer<String> deltaConsumer
+    ) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        HeaderCustomizer headers;
+        switch (properties.provider()) {
+            case OPENAI, AZURE_OPENAI -> {
+                body.put("model", properties.model());
+                body.put("instructions", systemPrompt(request));
+                body.put("input", prompt(request));
+                body.put("max_output_tokens", maxTokens(request));
+                addTemperature(body, request);
+                addResponseTuning(body, responseTextFormat(schemaName, schema));
+                body.put("store", properties.logInteractions());
+                body.put("stream", true);
+                headers = value -> {
+                    if (properties.provider() == LlmProvider.AZURE_OPENAI) {
+                        value.set("api-key", properties.apiKey());
+                    } else {
+                        value.setBearerAuth(properties.apiKey());
+                    }
+                };
+            }
+            case OPENAI_COMPATIBLE, MISTRAL -> {
+                body.put("model", properties.model());
+                body.put("messages", chatMessages(request));
+                body.put("max_tokens", maxTokens(request));
+                addTemperature(body, request);
+                addChatCompletionsTuning(body);
+                body.put("response_format", openAiResponseFormat(schemaName, schema));
+                body.put("stream", true);
+                body.put("stream_options", Map.of("include_usage", true));
+                headers = value -> value.setBearerAuth(properties.apiKey());
+            }
+            case ANTHROPIC -> {
+                body.put("model", properties.model());
+                body.put("max_tokens", maxTokens(request));
+                addTemperature(body, request);
+                body.put("system", systemPrompt(request));
+                body.put("messages", List.of(Map.of("role", "user", "content", prompt(request))));
+                Map<String, Object> outputConfig = new LinkedHashMap<>();
+                outputConfig.put("format", Map.of("type", "json_schema", "schema", schema));
+                addAnthropicTuning(body, outputConfig);
+                body.put("stream", true);
+                headers = value -> {
+                    value.set("x-api-key", properties.apiKey());
+                    value.set("anthropic-version", ANTHROPIC_VERSION);
+                };
+            }
+            case COHERE -> {
+                body.put("model", properties.model());
+                body.put("messages", List.of(
+                        Map.of("role", "system", "content", systemPrompt(request)),
+                        Map.of("role", "user", "content", prompt(request))));
+                body.put("max_tokens", maxTokens(request));
+                addTemperature(body, request);
+                body.put("response_format", Map.of("type", "json_object", "schema", schema));
+                body.put("stream", true);
+                headers = value -> value.setBearerAuth(properties.apiKey());
+            }
+            case OLLAMA -> {
+                body.put("model", properties.model());
+                body.put("messages", chatMessages(request));
+                body.put("stream", true);
+                body.put("format", schema);
+                Map<String, Object> options = new LinkedHashMap<>();
+                options.put("num_predict", maxTokens(request));
+                addTemperature(options, request);
+                body.put("options", options);
+                addOllamaTuning(body);
+                headers = value -> { };
+            }
+            case GOOGLE -> {
+                body.put("systemInstruction", Map.of(
+                        "parts", List.of(Map.of("text", systemPrompt(request)))));
+                body.put("contents", List.of(Map.of(
+                        "role", "user", "parts", List.of(Map.of("text", prompt(request))))));
+                addInteractionLogging(body);
+                Map<String, Object> generationConfig = new LinkedHashMap<>();
+                generationConfig.put("maxOutputTokens", maxTokens(request));
+                addTemperature(generationConfig, request);
+                generationConfig.put("responseMimeType", "application/json");
+                generationConfig.put("responseJsonSchema", schema);
+                addGoogleTuning(generationConfig);
+                body.put("generationConfig", generationConfig);
+                headers = value -> value.set("x-goog-api-key", properties.apiKey());
+            }
+            default -> throw new IllegalStateException("Unsupported LLM provider: " + properties.provider());
+        }
+        return stream(endpoint, body, headers, deltaConsumer);
+    }
+
+    private StreamCompletion stream(
+            URI endpoint,
+            Map<String, Object> body,
+            HeaderCustomizer headerCustomizer,
+            Consumer<String> deltaConsumer
+    ) {
+        try {
+            return restClient.post()
+                    .uri(endpoint)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_NDJSON)
+                    .headers(headerCustomizer::customize)
+                    .body(body)
+                    .exchange((request, response) -> {
+                        if (response.getStatusCode().isError()) {
+                            throw new LlmException("LLM provider request failed with status "
+                                    + response.getStatusCode().value());
+                        }
+                        StreamCompletionState state = new StreamCompletionState();
+                        try (BufferedReader reader = new BufferedReader(
+                                new InputStreamReader(response.getBody(), java.nio.charset.StandardCharsets.UTF_8))) {
+                            String line;
+                            while ((line = reader.readLine()) != null) {
+                                String data = line.startsWith("data:") ? line.substring(5).trim() : line.trim();
+                                if (data.isEmpty() || "[DONE]".equals(data) || !data.startsWith("{")) {
+                                    continue;
+                                }
+                                consumeStreamEvent(objectMapper.readTree(data), state, deltaConsumer);
+                            }
+                        } catch (IOException exception) {
+                            throw new LlmException("Failed to read LLM provider stream", exception);
+                        }
+                        return new StreamCompletion(state.completed, state.outputTokens);
+                    });
+        } catch (RestClientException exception) {
+            throw new LlmException("LLM provider request failed: " + exception.getMessage(), exception);
+        }
+    }
+
+    private void consumeStreamEvent(JsonNode event, StreamCompletionState state, Consumer<String> deltaConsumer) {
+        switch (properties.provider()) {
+            case OPENAI, AZURE_OPENAI -> {
+                String type = event.path("type").asText();
+                if ("response.output_text.delta".equals(type)) {
+                    deltaConsumer.accept(event.path("delta").asText());
+                } else if ("response.completed".equals(type)) {
+                    state.completed = true;
+                    state.outputTokens = event.at("/response/usage/output_tokens").asInt(0);
+                } else if ("response.failed".equals(type) || "response.incomplete".equals(type)) {
+                    throw new LlmException("LLM provider did not complete the structured response: " + type);
+                }
+            }
+            case OPENAI_COMPATIBLE, MISTRAL -> {
+                JsonNode content = event.at("/choices/0/delta/content");
+                if (content.isTextual()) {
+                    deltaConsumer.accept(content.asText());
+                }
+                JsonNode finishReason = event.at("/choices/0/finish_reason");
+                if (finishReason.isTextual()) {
+                    state.completed = "stop".equalsIgnoreCase(finishReason.asText());
+                }
+                state.outputTokens = event.at("/usage/completion_tokens").asInt(state.outputTokens);
+            }
+            case ANTHROPIC -> {
+                if ("content_block_delta".equals(event.path("type").asText())) {
+                    deltaConsumer.accept(event.at("/delta/text").asText());
+                } else if ("message_delta".equals(event.path("type").asText())) {
+                    state.completed = "end_turn".equalsIgnoreCase(event.at("/delta/stop_reason").asText());
+                    state.outputTokens = event.at("/usage/output_tokens").asInt(state.outputTokens);
+                }
+            }
+            case COHERE -> {
+                if ("content-delta".equals(event.path("type").asText())) {
+                    deltaConsumer.accept(event.at("/delta/message/content/text").asText());
+                } else if ("message-end".equals(event.path("type").asText())) {
+                    state.completed = true;
+                    state.outputTokens = event.at("/delta/usage/tokens/output_tokens").asInt(0);
+                }
+            }
+            case OLLAMA -> {
+                JsonNode content = event.at("/message/content");
+                if (content.isTextual()) {
+                    deltaConsumer.accept(content.asText());
+                }
+                if (event.path("done").asBoolean(false)) {
+                    state.completed = !"length".equalsIgnoreCase(event.path("done_reason").asText());
+                    state.outputTokens = event.path("eval_count").asInt(0);
+                }
+            }
+            case GOOGLE -> {
+                JsonNode content = event.at("/candidates/0/content/parts/0/text");
+                if (content.isTextual()) {
+                    deltaConsumer.accept(content.asText());
+                }
+                JsonNode finishReason = event.at("/candidates/0/finishReason");
+                if (finishReason.isTextual()) {
+                    state.completed = "STOP".equalsIgnoreCase(finishReason.asText());
+                }
+                state.outputTokens = event.at("/usageMetadata/candidatesTokenCount")
+                        .asInt(state.outputTokens);
+            }
+        }
+    }
+
+    private record StreamCompletion(boolean completed, int outputTokens) { }
+
+    private static final class StreamCompletionState {
+        private boolean completed;
+        private int outputTokens;
     }
 
     private Map<String, Object> openAiResponseFormat(String schemaName, JsonNode schema) {
@@ -593,6 +839,15 @@ public class LlmClient {
     private URI endpoint() {
         String endpoint = properties.effectiveEndpointUrl().toString().replace("{model}", properties.model());
         return URI.create(endpoint);
+    }
+
+    private URI streamingEndpoint() {
+        String value = endpoint().toString();
+        if (properties.provider() == LlmProvider.GOOGLE && value.contains(":generateContent")) {
+            value = value.replace(":generateContent", ":streamGenerateContent");
+            value += value.contains("?") ? "&alt=sse" : "?alt=sse";
+        }
+        return URI.create(value);
     }
 
     private String prompt(LlmCompletionRequest request) {

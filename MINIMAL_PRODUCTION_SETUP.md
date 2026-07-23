@@ -215,6 +215,20 @@ jq
 ```
 
 Repeat the request until the returned status is `completed` or `failed`.
+While the LLM response is streaming, each request may contain newly completed
+objects in `new_suggestions` even though the status is still `in_progress`.
+Accumulate those objects on the client: every suggestion is returned only once,
+so later polling requests contain only suggestions completed since the previous
+request. The status changes to `completed` only after the complete LLM response
+has arrived. A further poll after completion therefore returns an empty
+`new_suggestions` array.
+
+The repository smoke-test script performs this accumulation and checks for
+duplicate suggestion IDs automatically:
+
+```bash
+./run-minimal-production-smoke-test.sh --cleanup
+```
 
 ## 7. Confirm authentication is enforced
 

@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 @Service
 public class ClassSuggestionLlmService {
@@ -55,5 +56,36 @@ public class ClassSuggestionLlmService {
                 ClassSuggestionLlmResponse.class
         );
         return response.suggestions();
+    }
+
+    public StreamingSuggestions<ClassSuggestion> streamClasses(
+            String userId,
+            ClassSuggestionJobRequest request,
+            List<LegalActText> legalActTexts,
+            Consumer<ClassSuggestion> suggestionConsumer
+    ) {
+        Objects.requireNonNull(suggestionConsumer, "suggestionConsumer");
+        String requestData = requestData(userId, request, legalActTexts);
+        ClassSuggestionLlmResponse response = llmClient.completeStructuredStreaming(
+                userId,
+                completionRequest(requestData),
+                "class_suggestions",
+                LlmRequestSupport.classSuggestionResponseSchema(objectMapper),
+                ClassSuggestionLlmResponse.class,
+                ClassSuggestion.class,
+                suggestionConsumer
+        );
+        return new StreamingSuggestions<>(response.suggestions());
+    }
+
+    private String requestData(String userId, ClassSuggestionJobRequest request, List<LegalActText> legalActTexts) {
+        Objects.requireNonNull(userId, "userId");
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(legalActTexts, "legalActTexts");
+        return LlmRequestSupport.serializePrompt(objectMapper, request, legalActTexts, "Class");
+    }
+
+    private LlmCompletionRequest completionRequest(String requestData) {
+        return new LlmCompletionRequest(SYSTEM_PROMPT, SAMPLE_PROMPT + "\n\n" + requestData, null, null);
     }
 }

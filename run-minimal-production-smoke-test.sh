@@ -18,7 +18,8 @@ usage() {
 Usage: ./run-minimal-production-smoke-test.sh [OPTION]
 
 Build and start the local production-mode stack, wait for it to become ready,
-obtain a Keycloak token, start and poll a suggestion job, and verify that an
+obtain a Keycloak token, start and incrementally poll a streaming suggestion
+job, verify that suggestions are returned exactly once, and verify that an
 unauthenticated request is rejected.
 
 Options:
@@ -165,7 +166,7 @@ START_RESPONSE="$(
     --header "Authorization: Bearer ${ACCESS_TOKEN}" \
     --header 'Content-Type: application/json' \
     --data '{
-      "k": 1,
+      "k": 3,
       "structural_element_ids": [
         "https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1/hlava_1/par_3"
       ],
@@ -185,7 +186,10 @@ JOB_ID="$(jq --exit-status --raw-output \
 
 echo "Polling suggestion job ${JOB_ID}..."
 job_deadline=$((SECONDS + JOB_TIMEOUT_SECONDS))
+ALL_SUGGESTIONS='[]'
+poll_count=0
 while true; do
+  poll_count=$((poll_count + 1))
   STATUS_RESPONSE="$(
     curl --proxy '' \
       --resolve localhost:8080:127.0.0.1 \
@@ -196,20 +200,62 @@ while true; do
       --data-urlencode "jobIds=${JOB_ID}"
   )"
 
-  job_status="$(jq --raw-output --arg job_id "${JOB_ID}" \
-    '.[] | select(.job_id == $job_id) | .status // empty' <<<"${STATUS_RESPONSE}")"
+  JOB_RESPONSE="$(jq --exit-status --compact-output --arg job_id "${JOB_ID}" '
+    if type != "array" then
+      error("status response is not an array")
+    else
+      [.[] | select(.job_id == $job_id)] |
+      if length == 1 then .[0]
+      else error("expected exactly one response for the requested job")
+      end
+    end
+  ' <<<"${STATUS_RESPONSE}")" || fail "The API returned an invalid status response for job ${JOB_ID}"
+
+  job_status="$(jq --exit-status --raw-output \
+    '.status | select(type == "string" and length > 0)' <<<"${JOB_RESPONSE}")" \
+    || fail "The status response does not contain a valid job status"
+
+  NEW_SUGGESTIONS="$(jq --exit-status --compact-output '
+    .new_suggestions |
+    select(type == "array") |
+    if all(.[]; .suggestion_id | type == "string" and length > 0) then .
+    else error("a streamed suggestion has no valid suggestion_id")
+    end
+  ' <<<"${JOB_RESPONSE}")" || fail "The status response does not contain a valid new_suggestions array"
+
+  duplicate_ids="$(jq --null-input --raw-output \
+    --argjson seen "${ALL_SUGGESTIONS}" \
+    --argjson received "${NEW_SUGGESTIONS}" '
+      [$seen[], $received[]]
+      | group_by(.suggestion_id)
+      | map(select(length > 1) | .[0].suggestion_id)
+      | join(", ")
+    ')"
+  [[ -z "${duplicate_ids}" ]] \
+    || fail "Polling returned suggestion IDs more than once: ${duplicate_ids}"
+
+  new_suggestion_count="$(jq 'length' <<<"${NEW_SUGGESTIONS}")"
+  if ((new_suggestion_count > 0)); then
+    echo "Poll ${poll_count} returned ${new_suggestion_count} new completed suggestion(s):"
+    jq <<<"${NEW_SUGGESTIONS}"
+  fi
+  ALL_SUGGESTIONS="$(jq --compact-output --null-input \
+    --argjson seen "${ALL_SUGGESTIONS}" \
+    --argjson received "${NEW_SUGGESTIONS}" '$seen + $received')"
 
   case "${job_status}" in
     completed)
-      echo "${STATUS_RESPONSE}" | jq
-      echo "Suggestion job completed successfully."
+      total_suggestion_count="$(jq 'length' <<<"${ALL_SUGGESTIONS}")"
+      ((total_suggestion_count > 0)) \
+        || fail "Suggestion job completed without returning any suggestions"
+      echo "Suggestion job completed after ${poll_count} poll(s) with ${total_suggestion_count} suggestion(s)."
       break
       ;;
     failed)
       echo "${STATUS_RESPONSE}" | jq >&2
       fail "Suggestion job ${JOB_ID} failed; inspect the server logs for the underlying error"
       ;;
-    in_progress|'')
+    in_progress)
       ;;
     *)
       fail "Suggestion job returned unknown status: ${job_status}"
@@ -224,6 +270,26 @@ while true; do
   echo "Suggestion job status: ${job_status:-not returned yet}; retrying..."
   sleep "${POLL_INTERVAL_SECONDS}"
 done
+
+echo "Confirming that completed suggestions are not returned by another poll..."
+FINAL_STATUS_RESPONSE="$(
+  curl --proxy '' \
+    --resolve localhost:8080:127.0.0.1 \
+    --fail --silent --show-error \
+    --get \
+    "${STATUS_ENDPOINT}" \
+    --header "Authorization: Bearer ${ACCESS_TOKEN}" \
+    --data-urlencode "jobIds=${JOB_ID}"
+)"
+
+jq --exit-status --arg job_id "${JOB_ID}" '
+  [.[] | select(.job_id == $job_id)] |
+  length == 1 and
+  .[0].status == "completed" and
+  .[0].new_suggestions == []
+' <<<"${FINAL_STATUS_RESPONSE}" >/dev/null \
+  || fail "A poll after completion repeated suggestions or returned an invalid terminal status"
+echo "One-time suggestion delivery check passed."
 
 echo "Confirming that authentication is enforced..."
 unauthenticated_status="$(

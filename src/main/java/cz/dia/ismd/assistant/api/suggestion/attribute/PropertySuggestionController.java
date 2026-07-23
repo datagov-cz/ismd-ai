@@ -70,11 +70,9 @@ public class PropertySuggestionController implements PropertySuggestionApi {
     }
 
     private PropertySuggestionsJobResponse toResponse(SuggestionJob job) {
-        return new PropertySuggestionsJobResponse(
-                job.jobId(),
-                job.selectedClassId(),
-                job.status(),
-                job.attributeSuggestions()
-        );
+        synchronized (job) {
+            return new PropertySuggestionsJobResponse(
+                    job.jobId(), job.selectedClassId(), job.status(), job.drainAttributeSuggestions());
+        }
     }
 }

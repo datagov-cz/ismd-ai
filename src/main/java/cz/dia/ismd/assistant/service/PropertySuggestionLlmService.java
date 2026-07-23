@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 @Service
 public class PropertySuggestionLlmService {
@@ -50,5 +51,28 @@ public class PropertySuggestionLlmService {
                 PropertySuggestionLlmResponse.class
         );
         return response.suggestions();
+    }
+
+    public StreamingSuggestions<AttributeSuggestion> streamProperties(
+            String userId,
+            PropertySuggestionJobRequest request,
+            List<LegalActText> legalActTexts,
+            Consumer<AttributeSuggestion> suggestionConsumer
+    ) {
+        Objects.requireNonNull(suggestionConsumer, "suggestionConsumer");
+        Objects.requireNonNull(userId, "userId");
+        Objects.requireNonNull(request, "request");
+        Objects.requireNonNull(legalActTexts, "legalActTexts");
+        String requestData = LlmRequestSupport.serializePrompt(objectMapper, request, legalActTexts, "Property");
+        PropertySuggestionLlmResponse response = llmClient.completeStructuredStreaming(
+                userId,
+                new LlmCompletionRequest(SYSTEM_PROMPT, USER_PROMPT + "\n\n" + requestData, null, null),
+                "property_suggestions",
+                LlmRequestSupport.propertySuggestionResponseSchema(objectMapper),
+                PropertySuggestionLlmResponse.class,
+                AttributeSuggestion.class,
+                suggestionConsumer
+        );
+        return new StreamingSuggestions<>(response.suggestions());
     }
 }
