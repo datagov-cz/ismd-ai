@@ -7,6 +7,7 @@ import cz.dia.ismd.assistant.model.suggestion.DocumentContext;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.config.ApiEnvironment;
 import cz.dia.ismd.assistant.service.SuggestionJobService;
+import cz.dia.ismd.assistant.service.JobQueryValidator;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -29,15 +30,18 @@ public class ClassSuggestionController implements ClassSuggestionApi {
     private final SuggestionJobService suggestionJobService;
     private final ApiEnvironment apiEnvironment;
     private final DevelopmentApiResponses developmentApiResponses;
+    private final JobQueryValidator jobQueryValidator;
 
     public ClassSuggestionController(
             SuggestionJobService suggestionJobService,
             ApiEnvironment apiEnvironment,
-            DevelopmentApiResponses developmentApiResponses
+            DevelopmentApiResponses developmentApiResponses,
+            JobQueryValidator jobQueryValidator
     ) {
         this.suggestionJobService = suggestionJobService;
         this.apiEnvironment = apiEnvironment;
         this.developmentApiResponses = developmentApiResponses;
+        this.jobQueryValidator = jobQueryValidator;
     }
 
     @PostMapping("/legal-acts/{year}/{number}/{date}/class-suggestions-top-k-extraction-jobs")
@@ -62,6 +66,7 @@ public class ClassSuggestionController implements ClassSuggestionApi {
     public List<ClassSuggestionsJobResponse> getClassSuggestions(
             @RequestParam List<UUID> jobIds
     ) {
+        jobQueryValidator.validate(jobIds);
         if (apiEnvironment.isDevelopment()) {
             return developmentApiResponses.classSuggestions();
         }

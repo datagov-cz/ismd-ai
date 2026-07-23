@@ -1,6 +1,7 @@
 package cz.dia.ismd.assistant.api;
 
 import cz.dia.ismd.assistant.exception.JobNotFoundException;
+import cz.dia.ismd.assistant.exception.JobIdsLimitExceededException;
 import cz.dia.ismd.assistant.exception.SparqlAccessException;
 import cz.dia.ismd.assistant.exception.SuggestionNotFoundException;
 import cz.dia.ismd.assistant.exception.TokenLimitReachedException;
@@ -13,6 +14,11 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    @ExceptionHandler(JobIdsLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleJobIdsLimitExceeded(JobIdsLimitExceededException exception) {
+        return ResponseEntity.badRequest().body(new ErrorResponse(exception.getMessage()));
+    }
 
     @ExceptionHandler(JobNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleJobNotFound(JobNotFoundException exception) {
