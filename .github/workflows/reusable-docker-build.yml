@@ -18,9 +18,9 @@ on:
         type: boolean
         default: true
 
-permissions:
-  contents: read
-  packages: write
+# No top-level permissions block: a reusable workflow may not request more than
+# its caller grants. Callers set what they need — push-to-dev/main grant
+# packages: write; pr.yml grants packages: read (its build is push: false).
 
 jobs:
   docker-build:

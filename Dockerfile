@@ -16,6 +16,15 @@ RUN groupadd --system app && useradd --system --gid app app
 
 COPY --from=build /workspace/target/*.jar app.jar
 
+# Application Insights Java agent — baked in but NOT activated here on purpose.
+# Activation is a runtime toggle: Terraform sets
+# JAVA_TOOL_OPTIONS=-javaagent:/app/applicationinsights-agent.jar per env
+# (enable_app_insights_agent), so one image serves all envs and telemetry can be
+# flipped on/off without a rebuild. The agent reads APPLICATIONINSIGHTS_CONNECTION_STRING
+# (injected by TF) for its destination. Placed before chown so the non-root app
+# user can read it.
+ADD https://github.com/microsoft/ApplicationInsights-Java/releases/download/3.6.2/applicationinsights-agent-3.6.2.jar /app/applicationinsights-agent.jar
+
 RUN chown -R app:app /app
 
 USER app
