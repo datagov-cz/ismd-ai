@@ -120,12 +120,17 @@ public interface PropertySuggestionApi {
                                             value = OpenApiExamples.JOB_NOT_FOUND_ERROR_RESPONSE
                                     )
                             )
+                    ),
+                    @ApiResponse(
+                            responseCode = "400",
+                            description = "The request contains more job identifiers than allowed.",
+                            content = @Content(schema = @Schema(implementation = ErrorResponse.class))
                     )
             }
     )
     List<PropertySuggestionsJobResponse> getPropertySuggestions(
             @Parameter(
-                    description = "Job identifiers to retrieve.",
+                    description = "Job identifiers to retrieve. The maximum number is deployment-configurable.",
                     example = OpenApiExamples.PROPERTY_JOB_ID
             )
             List<UUID> jobIds
