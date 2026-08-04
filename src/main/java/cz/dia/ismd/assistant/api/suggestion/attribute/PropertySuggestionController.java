@@ -6,6 +6,7 @@ import cz.dia.ismd.assistant.model.job.JobStatus;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.config.ApiEnvironment;
 import cz.dia.ismd.assistant.service.SuggestionJobService;
+import cz.dia.ismd.assistant.service.JobQueryValidator;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -28,15 +29,18 @@ public class PropertySuggestionController implements PropertySuggestionApi {
     private final SuggestionJobService suggestionJobService;
     private final ApiEnvironment apiEnvironment;
     private final DevelopmentApiResponses developmentApiResponses;
+    private final JobQueryValidator jobQueryValidator;
 
     public PropertySuggestionController(
             SuggestionJobService suggestionJobService,
             ApiEnvironment apiEnvironment,
-            DevelopmentApiResponses developmentApiResponses
+            DevelopmentApiResponses developmentApiResponses,
+            JobQueryValidator jobQueryValidator
     ) {
         this.suggestionJobService = suggestionJobService;
         this.apiEnvironment = apiEnvironment;
         this.developmentApiResponses = developmentApiResponses;
+        this.jobQueryValidator = jobQueryValidator;
     }
 
     @PostMapping("/legal-acts/{year}/{number}/{date}/property-suggestions-top-k-extraction-jobs")
@@ -61,6 +65,7 @@ public class PropertySuggestionController implements PropertySuggestionApi {
     public List<PropertySuggestionsJobResponse> getPropertySuggestions(
             @RequestParam List<UUID> jobIds
     ) {
+        jobQueryValidator.validate(jobIds);
         if (apiEnvironment.isDevelopment()) {
             return developmentApiResponses.propertySuggestions();
         }
