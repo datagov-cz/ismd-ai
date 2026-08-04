@@ -24,17 +24,33 @@ public class SuggestionJob {
     private final List<RelationshipSuggestion> pendingRelationshipSuggestions;
 
     public SuggestionJob(UUID jobId, JobKind kind, String selectedClassId) {
+        this(jobId, kind, selectedClassId, Instant.now(), JobStatus.IN_PROGRESS,
+                List.of(), List.of(), List.of());
+    }
+
+    public SuggestionJob(
+            UUID jobId,
+            JobKind kind,
+            String selectedClassId,
+            Instant createdAt,
+            JobStatus status,
+            List<ClassSuggestion> classSuggestions,
+            List<AttributeSuggestion> attributeSuggestions,
+            List<RelationshipSuggestion> relationshipSuggestions
+    ) {
         this.jobId = jobId;
         this.kind = kind;
         this.selectedClassId = selectedClassId;
-        this.createdAt = Instant.now();
-        this.status = JobStatus.IN_PROGRESS;
-        this.classSuggestions = List.of();
-        this.attributeSuggestions = List.of();
-        this.relationshipSuggestions = List.of();
-        this.pendingClassSuggestions = new ArrayList<>();
-        this.pendingAttributeSuggestions = new ArrayList<>();
-        this.pendingRelationshipSuggestions = new ArrayList<>();
+        this.createdAt = createdAt;
+        this.status = status;
+        this.classSuggestions = List.copyOf(classSuggestions);
+        this.attributeSuggestions = List.copyOf(attributeSuggestions);
+        this.relationshipSuggestions = List.copyOf(relationshipSuggestions);
+        // A job restored from storage has not yet been observed by this application
+        // instance, so its persisted suggestions are new to the next API poll.
+        this.pendingClassSuggestions = new ArrayList<>(classSuggestions);
+        this.pendingAttributeSuggestions = new ArrayList<>(attributeSuggestions);
+        this.pendingRelationshipSuggestions = new ArrayList<>(relationshipSuggestions);
     }
 
     public UUID jobId() {
