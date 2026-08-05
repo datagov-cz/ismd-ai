@@ -76,7 +76,7 @@ public class ClassSuggestionController implements ClassSuggestionApi {
 
     private ClassSuggestionsJobResponse toResponse(SuggestionJob job) {
         synchronized (job) {
-            return new ClassSuggestionsJobResponse(job.jobId(), job.status(), job.drainClassSuggestions());
+            return new ClassSuggestionsJobResponse(job.jobId(), job.status(), job.classSuggestions());
         }
     }
 }

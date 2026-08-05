@@ -13,21 +13,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SuggestionJobStreamingTests {
 
     @Test
-    void pollingDrainsOnlyNewSuggestionsWhileKeepingCompleteHistory() {
+    void pollingReturnsTheCompleteSuggestionSnapshotEveryTime() {
         SuggestionJob job = new SuggestionJob(UUID.randomUUID(), JobKind.CLASS, null);
         ClassSuggestion first = suggestion("first");
         ClassSuggestion second = suggestion("second");
 
         job.addClassSuggestion(first);
         assertThat(job.status()).isEqualTo(JobStatus.IN_PROGRESS);
-        assertThat(job.drainClassSuggestions()).containsExactly(first);
-        assertThat(job.drainClassSuggestions()).isEmpty();
+        List<ClassSuggestion> firstPoll = job.classSuggestions();
+        List<ClassSuggestion> repeatedFirstPoll = job.classSuggestions();
+        assertThat(firstPoll).containsExactly(first);
+        assertThat(repeatedFirstPoll).containsExactly(first);
 
         job.addClassSuggestion(second);
         job.completeClasses(List.of(first, second));
         assertThat(job.status()).isEqualTo(JobStatus.COMPLETED);
-        assertThat(job.drainClassSuggestions()).containsExactly(second);
-        assertThat(job.classSuggestions()).containsExactly(first, second);
+        List<ClassSuggestion> completedPoll = job.classSuggestions();
+        List<ClassSuggestion> repeatedCompletedPoll = job.classSuggestions();
+        assertThat(completedPoll).containsExactly(first, second);
+        assertThat(repeatedCompletedPoll).containsExactly(first, second);
     }
 
     private ClassSuggestion suggestion(String id) {

@@ -47,6 +47,13 @@ class PropertySuggestionIntegrationTests extends AssistantIntegrationTest {
                 .andExpect(jsonPath("$[0].job_id").value(jobId.toString()))
                 .andExpect(jsonPath("$[0].selected_class_id").value("class_001"))
                 .andExpect(jsonPath("$[0].new_attribute_suggestions", hasSize(1)));
+
+        mockMvc.perform(get("/legal-acts/property-suggestions-jobs")
+                        .queryParam("jobIds", jobId.toString())
+                        .with(oidcAuthentication()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("completed"))
+                .andExpect(jsonPath("$[0].new_attribute_suggestions", hasSize(1)));
     }
 
     @Test

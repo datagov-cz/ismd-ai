@@ -52,7 +52,6 @@ class JobPersistenceIntegrationTests extends AssistantIntegrationTest {
         assertThat(restored.kind()).isEqualTo(JobKind.CLASS);
         assertThat(restored.status()).isEqualTo(JobStatus.COMPLETED);
         assertThat(restored.classSuggestions()).hasSize(1);
-        assertThat(restored.drainClassSuggestions()).containsExactlyElementsOf(restored.classSuggestions());
     }
 
     @Test

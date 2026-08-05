@@ -19,9 +19,6 @@ public class SuggestionJob {
     private volatile List<ClassSuggestion> classSuggestions;
     private volatile List<AttributeSuggestion> attributeSuggestions;
     private volatile List<RelationshipSuggestion> relationshipSuggestions;
-    private final List<ClassSuggestion> pendingClassSuggestions;
-    private final List<AttributeSuggestion> pendingAttributeSuggestions;
-    private final List<RelationshipSuggestion> pendingRelationshipSuggestions;
 
     public SuggestionJob(UUID jobId, JobKind kind, String selectedClassId) {
         this(jobId, kind, selectedClassId, Instant.now(), JobStatus.IN_PROGRESS,
@@ -46,11 +43,6 @@ public class SuggestionJob {
         this.classSuggestions = List.copyOf(classSuggestions);
         this.attributeSuggestions = List.copyOf(attributeSuggestions);
         this.relationshipSuggestions = List.copyOf(relationshipSuggestions);
-        // A job restored from storage has not yet been observed by this application
-        // instance, so its persisted suggestions are new to the next API poll.
-        this.pendingClassSuggestions = new ArrayList<>(classSuggestions);
-        this.pendingAttributeSuggestions = new ArrayList<>(attributeSuggestions);
-        this.pendingRelationshipSuggestions = new ArrayList<>(relationshipSuggestions);
     }
 
     public UUID jobId() {
@@ -87,29 +79,14 @@ public class SuggestionJob {
 
     public synchronized void addClassSuggestion(ClassSuggestion suggestion) {
         classSuggestions = append(classSuggestions, suggestion);
-        pendingClassSuggestions.add(suggestion);
     }
 
     public synchronized void addAttributeSuggestion(AttributeSuggestion suggestion) {
         attributeSuggestions = append(attributeSuggestions, suggestion);
-        pendingAttributeSuggestions.add(suggestion);
     }
 
     public synchronized void addRelationshipSuggestion(RelationshipSuggestion suggestion) {
         relationshipSuggestions = append(relationshipSuggestions, suggestion);
-        pendingRelationshipSuggestions.add(suggestion);
-    }
-
-    public synchronized List<ClassSuggestion> drainClassSuggestions() {
-        return drain(pendingClassSuggestions);
-    }
-
-    public synchronized List<AttributeSuggestion> drainAttributeSuggestions() {
-        return drain(pendingAttributeSuggestions);
-    }
-
-    public synchronized List<RelationshipSuggestion> drainRelationshipSuggestions() {
-        return drain(pendingRelationshipSuggestions);
     }
 
     public synchronized void completeClasses(List<ClassSuggestion> suggestions) {
@@ -149,9 +126,4 @@ public class SuggestionJob {
         return List.copyOf(result);
     }
 
-    private static <T> List<T> drain(List<T> pending) {
-        List<T> result = List.copyOf(pending);
-        pending.clear();
-        return result;
-    }
 }

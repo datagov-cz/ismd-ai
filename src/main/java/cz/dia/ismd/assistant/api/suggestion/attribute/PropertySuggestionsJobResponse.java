@@ -14,7 +14,7 @@ public record PropertySuggestionsJobResponse(
         String selectedClassId,
         @Schema(description = "Current processing status of the property suggestion job.")
         JobStatus status,
-        @Schema(description = "New attribute terms suggested for the selected class.")
+        @Schema(description = "All attribute terms generated for the selected class so far.")
         List<AttributeSuggestion> newAttributeSuggestions
 ) {
 }

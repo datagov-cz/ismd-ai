@@ -19,8 +19,9 @@ Usage: ./run-minimal-production-smoke-test.sh [OPTION]
 
 Build and start the local production-mode stack, wait for it to become ready,
 obtain a Keycloak token, start and incrementally poll a streaming suggestion
-job, verify that suggestions are returned exactly once, and verify that an
-unauthenticated request is rejected.
+job, verify that every poll contains the complete generated-term snapshot, and
+verify that an unauthenticated request is rejected. Finally, retrieve and print
+the completed job response.
 
 Options:
   --cleanup          Stop containers after the test (keeps database data)
@@ -166,9 +167,9 @@ START_RESPONSE="$(
     --header "Authorization: Bearer ${ACCESS_TOKEN}" \
     --header 'Content-Type: application/json' \
     --data '{
-      "k": 3,
+      "k": 10,
       "structural_element_ids": [
-        "https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1/hlava_1/par_3"
+        "https://e-sbirka.gov.cz/eli/cz/sb/2026/60/2026-05-27/dokument/norma/cast_1"
       ],
       "context_text": "Generate the main conceptual-model class.",
       "known_conceptual_model": {
@@ -215,7 +216,7 @@ while true; do
     '.status | select(type == "string" and length > 0)' <<<"${JOB_RESPONSE}")" \
     || fail "The status response does not contain a valid job status"
 
-  NEW_SUGGESTIONS="$(jq --exit-status --compact-output '
+  CURRENT_SUGGESTIONS="$(jq --exit-status --compact-output '
     .new_suggestions |
     select(type == "array") |
     if all(.[]; .suggestion_id | type == "string" and length > 0) then .
@@ -224,24 +225,26 @@ while true; do
   ' <<<"${JOB_RESPONSE}")" || fail "The status response does not contain a valid new_suggestions array"
 
   duplicate_ids="$(jq --null-input --raw-output \
-    --argjson seen "${ALL_SUGGESTIONS}" \
-    --argjson received "${NEW_SUGGESTIONS}" '
-      [$seen[], $received[]]
+    --argjson received "${CURRENT_SUGGESTIONS}" '
+      $received
       | group_by(.suggestion_id)
       | map(select(length > 1) | .[0].suggestion_id)
       | join(", ")
     ')"
   [[ -z "${duplicate_ids}" ]] \
-    || fail "Polling returned suggestion IDs more than once: ${duplicate_ids}"
+    || fail "A polling response contains duplicate suggestion IDs: ${duplicate_ids}"
 
-  new_suggestion_count="$(jq 'length' <<<"${NEW_SUGGESTIONS}")"
-  if ((new_suggestion_count > 0)); then
-    echo "Poll ${poll_count} returned ${new_suggestion_count} new completed suggestion(s):"
-    jq <<<"${NEW_SUGGESTIONS}"
-  fi
-  ALL_SUGGESTIONS="$(jq --compact-output --null-input \
+  missing_ids="$(jq --null-input --raw-output \
     --argjson seen "${ALL_SUGGESTIONS}" \
-    --argjson received "${NEW_SUGGESTIONS}" '$seen + $received')"
+    --argjson received "${CURRENT_SUGGESTIONS}" '
+      ([$seen[].suggestion_id] - [$received[].suggestion_id]) | join(", ")
+    ')"
+  [[ -z "${missing_ids}" ]] \
+    || fail "A polling response omitted previously generated suggestion IDs: ${missing_ids}"
+
+  suggestion_count="$(jq 'length' <<<"${CURRENT_SUGGESTIONS}")"
+  echo "Poll ${poll_count} returned the complete snapshot of ${suggestion_count} generated suggestion(s)."
+  ALL_SUGGESTIONS="${CURRENT_SUGGESTIONS}"
 
   case "${job_status}" in
     completed)
@@ -271,7 +274,7 @@ while true; do
   sleep "${POLL_INTERVAL_SECONDS}"
 done
 
-echo "Confirming that completed suggestions are not returned by another poll..."
+echo "Confirming that another completed-job poll returns the full final snapshot..."
 FINAL_STATUS_RESPONSE="$(
   curl --proxy '' \
     --resolve localhost:8080:127.0.0.1 \
@@ -282,14 +285,14 @@ FINAL_STATUS_RESPONSE="$(
     --data-urlencode "jobIds=${JOB_ID}"
 )"
 
-jq --exit-status --arg job_id "${JOB_ID}" '
+jq --exit-status --arg job_id "${JOB_ID}" --argjson expected "${ALL_SUGGESTIONS}" '
   [.[] | select(.job_id == $job_id)] |
   length == 1 and
   .[0].status == "completed" and
-  .[0].new_suggestions == []
+  .[0].new_suggestions == $expected
 ' <<<"${FINAL_STATUS_RESPONSE}" >/dev/null \
-  || fail "A poll after completion repeated suggestions or returned an invalid terminal status"
-echo "One-time suggestion delivery check passed."
+  || fail "A poll after completion did not return the complete final suggestion snapshot"
+echo "Complete-snapshot polling check passed."
 
 echo "Confirming that authentication is enforced..."
 unauthenticated_status="$(
@@ -306,4 +309,26 @@ unauthenticated_status="$(
   || fail "Expected unauthenticated request to return HTTP 401, got ${unauthenticated_status}"
 
 echo "Authentication check passed (HTTP 401)."
+
+echo "Retrieving the complete response for completed suggestion job ${JOB_ID}..."
+COMPLETED_JOB_RESPONSE="$(
+  curl --proxy '' \
+    --resolve localhost:8080:127.0.0.1 \
+    --fail-with-body --silent --show-error \
+    --get \
+    "${STATUS_ENDPOINT}" \
+    --header "Authorization: Bearer ${ACCESS_TOKEN}" \
+    --data-urlencode "jobIds=${JOB_ID}"
+)"
+
+jq --exit-status --arg job_id "${JOB_ID}" '
+  type == "array" and
+  length == 1 and
+  .[0].job_id == $job_id and
+  .[0].status == "completed"
+' <<<"${COMPLETED_JOB_RESPONSE}" >/dev/null \
+  || fail "The final response for completed suggestion job ${JOB_ID} is invalid"
+
+echo "Complete response for suggestion job ${JOB_ID}:"
+jq <<<"${COMPLETED_JOB_RESPONSE}"
 echo "Minimal production-mode smoke test finished successfully."

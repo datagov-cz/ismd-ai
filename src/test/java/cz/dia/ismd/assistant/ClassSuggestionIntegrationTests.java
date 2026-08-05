@@ -64,6 +64,14 @@ class ClassSuggestionIntegrationTests extends AssistantIntegrationTest {
                 .andExpect(jsonPath("$[0].new_suggestions", hasSize(2)))
                 .andExpect(jsonPath("$[0].new_suggestions[0].name.cs").value("Property Actor"))
                 .andExpect(jsonPath("$[0].new_suggestions[0].legal_act").value("/eli/cz/sb/2024/1"));
+
+        mockMvc.perform(get("/legal-acts/class-suggestions-jobs")
+                        .queryParam("jobIds", jobId.toString())
+                        .with(oidcAuthentication()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("completed"))
+                .andExpect(jsonPath("$[0].new_suggestions", hasSize(2)))
+                .andExpect(jsonPath("$[0].new_suggestions[0].name.cs").value("Property Actor"));
     }
 
     @Test

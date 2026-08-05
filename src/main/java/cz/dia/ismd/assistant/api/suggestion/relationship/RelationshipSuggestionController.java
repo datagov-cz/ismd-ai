@@ -77,7 +77,7 @@ public class RelationshipSuggestionController implements RelationshipSuggestionA
     private RelationshipSuggestionsJobResponse toResponse(SuggestionJob job) {
         synchronized (job) {
             return new RelationshipSuggestionsJobResponse(
-                    job.jobId(), job.selectedClassId(), job.status(), job.drainRelationshipSuggestions());
+                    job.jobId(), job.selectedClassId(), job.status(), job.relationshipSuggestions());
         }
     }
 }
