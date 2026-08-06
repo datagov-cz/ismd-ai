@@ -14,6 +14,20 @@ mvn spring-boot:run
 
 The API starts on `http://localhost:8080`.
 
+### Single-instance deployment constraint
+
+Run exactly one application instance against a given PostgreSQL database. The current job
+processor keeps live streams in local memory and marks leftover `IN_PROGRESS` rows as `FAILED`
+at startup, so it does not support multiple application replicas. The supplied Docker Compose 
+configurations declare one server replica.
+
+### Failed jobs and partial results
+
+Job-result GET endpoints return every complete suggestion generated so far for every status.
+If an LLM stream is truncated or otherwise fails after producing complete suggestions, the job
+has status `FAILED` and those partial suggestions remain available. Clients must use the status
+to distinguish a complete result set from partial output.
+
 All REST endpoints require OIDC authentication with a bearer JWT:
 
 ```http

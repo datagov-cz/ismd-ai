@@ -14,7 +14,7 @@ public record RelationshipSuggestionsJobResponse(
         String selectedClassId,
         @Schema(description = "Current processing status of the relationship suggestion job.")
         JobStatus status,
-        @Schema(description = "All relationship terms generated for the selected source class so far.")
+        @Schema(description = "All complete relationship terms generated so far, including partial results of a failed job.")
         List<RelationshipSuggestion> newRelationshipSuggestions
 ) {
 }

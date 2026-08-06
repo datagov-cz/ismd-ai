@@ -12,7 +12,7 @@ public record ClassSuggestionsJobResponse(
         UUID jobId,
         @Schema(description = "Current processing status of the class suggestion job.")
         JobStatus status,
-        @Schema(description = "All class terms generated for the job so far.")
+        @Schema(description = "All complete class terms generated so far, including partial results of a failed job.")
         List<ClassSuggestion> newSuggestions
 ) {
 }

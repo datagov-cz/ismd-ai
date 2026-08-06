@@ -148,10 +148,14 @@ public class LlmClient {
                 new StructuredSuggestionsParser<>(objectMapper, suggestionType, suggestionConsumer);
         StreamCompletion completion = postStructuredStream(
                 streamingEndpoint(), request, schemaName, schema, parser::accept);
-        if (!completion.completed()) {
-            throw new LlmException("LLM provider ended the stream before completing the structured response");
-        }
         tokenUsageService.addOutputTokens(userId, completion.outputTokens());
+        if (!completion.completed()) {
+            String message = "LLM provider ended the stream before completing the structured response";
+            if (completion.failureReason() != null && !completion.failureReason().isBlank()) {
+                message += ": provider=" + properties.provider() + ", reason=" + completion.failureReason();
+            }
+            throw new LlmException(message);
+        }
         try {
             return objectMapper.readValue(parser.content(), responseType);
         } catch (JsonProcessingException exception) {
@@ -288,7 +292,7 @@ public class LlmClient {
                         } catch (IOException exception) {
                             throw new LlmException("Failed to read LLM provider stream", exception);
                         }
-                        return new StreamCompletion(state.completed, state.outputTokens);
+                        return new StreamCompletion(state.completed, state.outputTokens, state.failureReason);
                     });
         } catch (RestClientException exception) {
             throw new LlmException("LLM provider request failed: " + exception.getMessage(), exception);
@@ -305,7 +309,17 @@ public class LlmClient {
                     state.completed = true;
                     state.outputTokens = event.at("/response/usage/output_tokens").asInt(0);
                 } else if ("response.failed".equals(type) || "response.incomplete".equals(type)) {
-                    throw new LlmException("LLM provider did not complete the structured response: " + type);
+                    state.completed = false;
+                    state.outputTokens = event.at("/response/usage/output_tokens").asInt(state.outputTokens);
+                    JsonNode reason = "response.incomplete".equals(type)
+                            ? event.at("/response/incomplete_details/reason")
+                            : event.at("/response/error/code");
+                    if (!reason.isTextual() || reason.asText().isBlank()) {
+                        reason = event.at("/response/error/message");
+                    }
+                    state.failureReason = reason.isTextual() && !reason.asText().isBlank()
+                            ? reason.asText()
+                            : type;
                 }
             }
             case OPENAI_COMPATIBLE, MISTRAL -> {
@@ -316,6 +330,9 @@ public class LlmClient {
                 JsonNode finishReason = event.at("/choices/0/finish_reason");
                 if (finishReason.isTextual()) {
                     state.completed = "stop".equalsIgnoreCase(finishReason.asText());
+                    if (!state.completed) {
+                        state.failureReason = finishReason.asText();
+                    }
                 }
                 state.outputTokens = event.at("/usage/completion_tokens").asInt(state.outputTokens);
             }
@@ -323,7 +340,11 @@ public class LlmClient {
                 if ("content_block_delta".equals(event.path("type").asText())) {
                     deltaConsumer.accept(event.at("/delta/text").asText());
                 } else if ("message_delta".equals(event.path("type").asText())) {
-                    state.completed = "end_turn".equalsIgnoreCase(event.at("/delta/stop_reason").asText());
+                    String stopReason = event.at("/delta/stop_reason").asText();
+                    state.completed = "end_turn".equalsIgnoreCase(stopReason);
+                    if (!state.completed && !stopReason.isBlank()) {
+                        state.failureReason = stopReason;
+                    }
                     state.outputTokens = event.at("/usage/output_tokens").asInt(state.outputTokens);
                 }
             }
@@ -331,7 +352,11 @@ public class LlmClient {
                 if ("content-delta".equals(event.path("type").asText())) {
                     deltaConsumer.accept(event.at("/delta/message/content/text").asText());
                 } else if ("message-end".equals(event.path("type").asText())) {
-                    state.completed = true;
+                    String finishReason = event.at("/delta/finish_reason").asText();
+                    state.completed = "COMPLETE".equalsIgnoreCase(finishReason);
+                    if (!state.completed && !finishReason.isBlank()) {
+                        state.failureReason = finishReason;
+                    }
                     state.outputTokens = event.at("/delta/usage/tokens/output_tokens").asInt(0);
                 }
             }
@@ -341,7 +366,11 @@ public class LlmClient {
                     deltaConsumer.accept(content.asText());
                 }
                 if (event.path("done").asBoolean(false)) {
-                    state.completed = !"length".equalsIgnoreCase(event.path("done_reason").asText());
+                    String doneReason = event.path("done_reason").asText();
+                    state.completed = "stop".equalsIgnoreCase(doneReason);
+                    if (!state.completed && !doneReason.isBlank()) {
+                        state.failureReason = doneReason;
+                    }
                     state.outputTokens = event.path("eval_count").asInt(0);
                 }
             }
@@ -353,6 +382,9 @@ public class LlmClient {
                 JsonNode finishReason = event.at("/candidates/0/finishReason");
                 if (finishReason.isTextual()) {
                     state.completed = "STOP".equalsIgnoreCase(finishReason.asText());
+                    if (!state.completed) {
+                        state.failureReason = finishReason.asText();
+                    }
                 }
                 state.outputTokens = event.at("/usageMetadata/candidatesTokenCount")
                         .asInt(state.outputTokens);
@@ -360,11 +392,12 @@ public class LlmClient {
         }
     }
 
-    private record StreamCompletion(boolean completed, int outputTokens) { }
+    private record StreamCompletion(boolean completed, int outputTokens, String failureReason) { }
 
     private static final class StreamCompletionState {
         private boolean completed;
         private int outputTokens;
+        private String failureReason;
     }
 
     private Map<String, Object> openAiResponseFormat(String schemaName, JsonNode schema) {

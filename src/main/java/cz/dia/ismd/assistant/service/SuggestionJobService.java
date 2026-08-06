@@ -4,6 +4,7 @@ import cz.dia.ismd.assistant.api.suggestion.classsuggestion.ClassSuggestionJobRe
 import cz.dia.ismd.assistant.api.suggestion.attribute.PropertySuggestionJobRequest;
 import cz.dia.ismd.assistant.api.suggestion.relationship.RelationshipSuggestionJobRequest;
 import cz.dia.ismd.assistant.model.job.JobKind;
+import cz.dia.ismd.assistant.model.job.JobStatus;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.model.legal.LegalActText;
 import cz.dia.ismd.assistant.model.suggestion.attribute.AttributeSuggestion;
@@ -85,7 +86,7 @@ public class SuggestionJobService {
                                 ? classSuggestionLlmService.suggestClasses(userId, request, legalActTexts)
                                 : streamed.suggestions();
                 job.completeClasses(suggestions);
-                persist(job);
+                persistTerminalAndEvict(job);
             } catch (RuntimeException exception) {
                 failJob(job, exception);
             }
@@ -110,7 +111,7 @@ public class SuggestionJobService {
                                 ? propertySuggestionLlmService.suggestProperties(userId, request, legalActTexts)
                                 : streamed.suggestions();
                 job.completeAttributes(suggestions);
-                persist(job);
+                persistTerminalAndEvict(job);
             } catch (RuntimeException exception) {
                 failJob(job, exception);
             }
@@ -136,7 +137,7 @@ public class SuggestionJobService {
                                         userId, request, legalActTexts)
                                 : streamed.suggestions();
                 job.completeRelationships(suggestions);
-                persist(job);
+                persistTerminalAndEvict(job);
             } catch (RuntimeException exception) {
                 failJob(job, exception);
             }
@@ -146,14 +147,11 @@ public class SuggestionJobService {
 
     public SuggestionJob get(UUID jobId) {
         SuggestionJob job = jobs.get(jobId);
-        if (job == null && suggestionJobRepository != null) {
+        if (job != null && (suggestionJobRepository == null || job.status() == JobStatus.IN_PROGRESS)) {
+            return job;
+        }
+        if (suggestionJobRepository != null) {
             job = suggestionJobRepository.findById(jobId).orElse(null);
-            if (job != null) {
-                SuggestionJob existing = jobs.putIfAbsent(jobId, job);
-                if (existing != null) {
-                    job = existing;
-                }
-            }
         }
         if (job == null) {
             throw new JobNotFoundException(jobId);
@@ -225,12 +223,19 @@ public class SuggestionJobService {
                 exception
         );
         job.fail();
-        persist(job);
+        persistTerminalAndEvict(job);
     }
 
     private void persist(SuggestionJob job) {
         if (suggestionJobRepository != null) {
             suggestionJobRepository.update(job);
+        }
+    }
+
+    private void persistTerminalAndEvict(SuggestionJob job) {
+        persist(job);
+        if (suggestionJobRepository != null) {
+            jobs.remove(job.jobId(), job);
         }
     }
 
