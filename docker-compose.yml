@@ -1,5 +1,7 @@
 services:
   server:
+    deploy:
+      replicas: 1
     build:
       context: .
     image: semantic-modeling-assistant:local

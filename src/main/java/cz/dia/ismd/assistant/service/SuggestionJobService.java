@@ -4,11 +4,16 @@ import cz.dia.ismd.assistant.api.suggestion.classsuggestion.ClassSuggestionJobRe
 import cz.dia.ismd.assistant.api.suggestion.attribute.PropertySuggestionJobRequest;
 import cz.dia.ismd.assistant.api.suggestion.relationship.RelationshipSuggestionJobRequest;
 import cz.dia.ismd.assistant.model.job.JobKind;
+import cz.dia.ismd.assistant.model.job.JobStatus;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.model.legal.LegalActText;
+import cz.dia.ismd.assistant.model.suggestion.attribute.AttributeSuggestion;
+import cz.dia.ismd.assistant.model.suggestion.classsuggestion.ClassSuggestion;
+import cz.dia.ismd.assistant.model.suggestion.relationship.RelationshipSuggestion;
 import cz.dia.ismd.assistant.exception.JobNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashSet;
@@ -32,20 +37,35 @@ public class SuggestionJobService {
     private final RelationshipSuggestionLlmService relationshipSuggestionLlmService;
     private final LegalActSPARQLService legalActSPARQLService;
     private final TokenUsageService tokenUsageService;
+    private final SuggestionJobRepository suggestionJobRepository;
     private final Map<UUID, SuggestionJob> jobs = new ConcurrentHashMap<>();
 
+    @Autowired
     public SuggestionJobService(
             ClassSuggestionLlmService classSuggestionLlmService,
             PropertySuggestionLlmService propertySuggestionLlmService,
             RelationshipSuggestionLlmService relationshipSuggestionLlmService,
             LegalActSPARQLService legalActSPARQLService,
-            TokenUsageService tokenUsageService
+            TokenUsageService tokenUsageService,
+            SuggestionJobRepository suggestionJobRepository
     ) {
         this.classSuggestionLlmService = classSuggestionLlmService;
         this.propertySuggestionLlmService = propertySuggestionLlmService;
         this.relationshipSuggestionLlmService = relationshipSuggestionLlmService;
         this.legalActSPARQLService = legalActSPARQLService;
         this.tokenUsageService = tokenUsageService;
+        this.suggestionJobRepository = suggestionJobRepository;
+    }
+
+    SuggestionJobService(
+            ClassSuggestionLlmService classSuggestionLlmService,
+            PropertySuggestionLlmService propertySuggestionLlmService,
+            RelationshipSuggestionLlmService relationshipSuggestionLlmService,
+            LegalActSPARQLService legalActSPARQLService,
+            TokenUsageService tokenUsageService
+    ) {
+        this(classSuggestionLlmService, propertySuggestionLlmService, relationshipSuggestionLlmService,
+                legalActSPARQLService, tokenUsageService, null);
     }
 
     public SuggestionJob startClassJob(String userId, ClassSuggestionJobRequest request) {
@@ -54,7 +74,19 @@ public class SuggestionJobService {
         CompletableFuture.runAsync(() -> {
             try {
                 List<LegalActText> legalActTexts = retrieveLegalActTexts(job, request.structuralElementIds());
-                job.completeClasses(classSuggestionLlmService.suggestClasses(userId, request, legalActTexts));
+                StreamingSuggestions<ClassSuggestion> streamed =
+                        classSuggestionLlmService.streamClasses(
+                                userId, request, legalActTexts, suggestion -> {
+                                    job.addClassSuggestion(suggestion);
+                                    persist(job);
+                                });
+                // Allows existing custom/mock implementations that only implement the buffered method.
+                List<ClassSuggestion> suggestions =
+                        streamed == null
+                                ? classSuggestionLlmService.suggestClasses(userId, request, legalActTexts)
+                                : streamed.suggestions();
+                job.completeClasses(suggestions);
+                persistTerminalAndEvict(job);
             } catch (RuntimeException exception) {
                 failJob(job, exception);
             }
@@ -68,7 +100,18 @@ public class SuggestionJobService {
         CompletableFuture.runAsync(() -> {
             try {
                 List<LegalActText> legalActTexts = retrieveLegalActTexts(job, request.structuralElementIds());
-                job.completeAttributes(propertySuggestionLlmService.suggestProperties(userId, request, legalActTexts));
+                StreamingSuggestions<AttributeSuggestion> streamed =
+                        propertySuggestionLlmService.streamProperties(
+                                userId, request, legalActTexts, suggestion -> {
+                                    job.addAttributeSuggestion(suggestion);
+                                    persist(job);
+                                });
+                List<AttributeSuggestion> suggestions =
+                        streamed == null
+                                ? propertySuggestionLlmService.suggestProperties(userId, request, legalActTexts)
+                                : streamed.suggestions();
+                job.completeAttributes(suggestions);
+                persistTerminalAndEvict(job);
             } catch (RuntimeException exception) {
                 failJob(job, exception);
             }
@@ -82,8 +125,19 @@ public class SuggestionJobService {
         CompletableFuture.runAsync(() -> {
             try {
                 List<LegalActText> legalActTexts = retrieveLegalActTexts(job, request.structuralElementIds());
-                job.completeRelationships(relationshipSuggestionLlmService.suggestRelationships(
-                        userId, request, legalActTexts));
+                StreamingSuggestions<RelationshipSuggestion> streamed =
+                        relationshipSuggestionLlmService.streamRelationships(
+                                userId, request, legalActTexts, suggestion -> {
+                                    job.addRelationshipSuggestion(suggestion);
+                                    persist(job);
+                                });
+                List<RelationshipSuggestion> suggestions =
+                        streamed == null
+                                ? relationshipSuggestionLlmService.suggestRelationships(
+                                        userId, request, legalActTexts)
+                                : streamed.suggestions();
+                job.completeRelationships(suggestions);
+                persistTerminalAndEvict(job);
             } catch (RuntimeException exception) {
                 failJob(job, exception);
             }
@@ -93,6 +147,12 @@ public class SuggestionJobService {
 
     public SuggestionJob get(UUID jobId) {
         SuggestionJob job = jobs.get(jobId);
+        if (job != null && (suggestionJobRepository == null || job.status() == JobStatus.IN_PROGRESS)) {
+            return job;
+        }
+        if (suggestionJobRepository != null) {
+            job = suggestionJobRepository.findById(jobId).orElse(null);
+        }
         if (job == null) {
             throw new JobNotFoundException(jobId);
         }
@@ -112,6 +172,9 @@ public class SuggestionJobService {
     private SuggestionJob createJob(JobKind kind, String selectedClassId) {
         UUID jobId = UUID.randomUUID();
         SuggestionJob job = new SuggestionJob(jobId, kind, selectedClassId);
+        if (suggestionJobRepository != null) {
+            suggestionJobRepository.insert(job);
+        }
         jobs.put(jobId, job);
         return job;
     }
@@ -160,6 +223,20 @@ public class SuggestionJobService {
                 exception
         );
         job.fail();
+        persistTerminalAndEvict(job);
+    }
+
+    private void persist(SuggestionJob job) {
+        if (suggestionJobRepository != null) {
+            suggestionJobRepository.update(job);
+        }
+    }
+
+    private void persistTerminalAndEvict(SuggestionJob job) {
+        persist(job);
+        if (suggestionJobRepository != null) {
+            jobs.remove(job.jobId(), job);
+        }
     }
 
 }

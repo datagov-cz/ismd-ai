@@ -53,6 +53,13 @@ class RelationshipSuggestionIntegrationTests extends AssistantIntegrationTest {
                 .andExpect(jsonPath("$[0].status").value("completed"))
                 .andExpect(jsonPath("$[0].new_relationship_suggestions", hasSize(2)))
                 .andExpect(jsonPath("$[0].new_relationship_suggestions[0].legal_act").value("/eli/cz/sb/2024/1"));
+
+        mockMvc.perform(get("/legal-acts/relationship-suggestions-jobs")
+                        .queryParam("jobIds", jobId.toString())
+                        .with(oidcAuthentication()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("completed"))
+                .andExpect(jsonPath("$[0].new_relationship_suggestions", hasSize(2)));
     }
 
     @Test

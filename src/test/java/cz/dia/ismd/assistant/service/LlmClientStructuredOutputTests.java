@@ -13,6 +13,7 @@ import cz.dia.ismd.assistant.model.llm.ClassSuggestionLlmResponse;
 import cz.dia.ismd.assistant.model.llm.LlmCompletionRequest;
 import cz.dia.ismd.assistant.model.llm.LlmCompletionResponse;
 import cz.dia.ismd.assistant.model.llm.LlmProvider;
+import cz.dia.ismd.assistant.model.suggestion.classsuggestion.ClassSuggestion;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -23,6 +24,8 @@ import org.springframework.web.client.RestClient;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +52,101 @@ class LlmClientStructuredOutputTests {
               }]
             }
             """;
+
+    @Test
+    void streamsEachCompleteSuggestionBeforeTheTerminalEvent() throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper()
+                .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        URI endpoint = URI.create("https://llm.test/responses");
+        LlmProperties properties = new LlmProperties(
+                true, LlmProvider.OPENAI, endpoint, "test-model", "test-key",
+                512, null, null, null, Duration.ofSeconds(5), false);
+        TokenUsageService tokenUsageService = mock(TokenUsageService.class);
+        LlmClient client = new LlmClient(builder.build(), properties, objectMapper, tokenUsageService);
+        JsonNode schema = objectMapper.readTree("""
+                {"type":"object","properties":{"suggestions":{"type":"array"}},"required":["suggestions"]}
+                """);
+        String first = STRUCTURED_CONTENT.substring(0, STRUCTURED_CONTENT.indexOf("}]") + 1);
+        String second = STRUCTURED_CONTENT.substring(STRUCTURED_CONTENT.indexOf("}]") + 1);
+        String events = "data: " + objectMapper.writeValueAsString(objectMapper.createObjectNode()
+                .put("type", "response.output_text.delta").put("delta", first)) + "\n\n"
+                + "data: " + objectMapper.writeValueAsString(objectMapper.createObjectNode()
+                .put("type", "response.output_text.delta").put("delta", second)) + "\n\n"
+                + "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"output_tokens\":17}}}\n\n";
+        server.expect(requestTo(endpoint))
+                .andExpect(jsonPath("$.stream").value(true))
+                .andRespond(withSuccess(events, MediaType.TEXT_EVENT_STREAM));
+        List<ClassSuggestion> published = new ArrayList<>();
+
+        ClassSuggestionLlmResponse response = client.completeStructuredStreaming(
+                "test-user", new LlmCompletionRequest("Return JSON.", "Suggest classes.", null, null),
+                "class_suggestions", schema, ClassSuggestionLlmResponse.class,
+                cz.dia.ismd.assistant.model.suggestion.classsuggestion.ClassSuggestion.class, published::add);
+
+        assertThat(published).hasSize(1);
+        assertThat(response.suggestions()).containsExactlyElementsOf(published);
+        verify(tokenUsageService).addOutputTokens("test-user", 17);
+        server.verify();
+    }
+
+    @Test
+    void reportsOpenAiIncompleteStreamReasonAndStillBillsReportedUsage() throws Exception {
+        String events = "data: {\"type\":\"response.incomplete\",\"response\":{"
+                + "\"incomplete_details\":{\"reason\":\"max_output_tokens\"},"
+                + "\"usage\":{\"output_tokens\":41}}}\n\n";
+
+        assertRejectedStructuredStream(LlmProvider.OPENAI, events, 41, "max_output_tokens");
+    }
+
+    @Test
+    void rejectsCohereMaxTokensStreamAndStillBillsReportedUsage() throws Exception {
+        String events = "data: {\"type\":\"content-delta\",\"delta\":{\"message\":{\"content\":{\"text\":"
+                + new ObjectMapper().writeValueAsString(STRUCTURED_CONTENT)
+                + "}}}}\n\n"
+                + "data: {\"type\":\"message-end\",\"delta\":{\"finish_reason\":\"MAX_TOKENS\","
+                + "\"usage\":{\"tokens\":{\"output_tokens\":23}}}}\n\n";
+
+        assertRejectedStructuredStream(LlmProvider.COHERE, events, 23, "MAX_TOKENS");
+    }
+
+    @Test
+    void acceptsCohereCompleteStream() throws Exception {
+        String events = "data: {\"type\":\"content-delta\",\"delta\":{\"message\":{\"content\":{\"text\":"
+                + new ObjectMapper().writeValueAsString(STRUCTURED_CONTENT)
+                + "}}}}\n\n"
+                + "data: {\"type\":\"message-end\",\"delta\":{\"finish_reason\":\"COMPLETE\","
+                + "\"usage\":{\"tokens\":{\"output_tokens\":19}}}}\n\n";
+
+        assertAcceptedStructuredStream(LlmProvider.COHERE, events, 19);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"length, 29", "unload, 30"})
+    void rejectsOllamaNonStopStreamAndStillBillsReportedUsage(
+            String doneReason,
+            int outputTokens
+    ) throws Exception {
+        String events = "{\"message\":{\"content\":"
+                + new ObjectMapper().writeValueAsString(STRUCTURED_CONTENT)
+                + "},\"done\":false}\n"
+                + "{\"message\":{\"content\":\"\"},\"done\":true,"
+                + "\"done_reason\":\"" + doneReason + "\",\"eval_count\":" + outputTokens + "}\n";
+
+        assertRejectedStructuredStream(LlmProvider.OLLAMA, events, outputTokens, doneReason);
+    }
+
+    @Test
+    void acceptsOllamaStopStream() throws Exception {
+        String events = "{\"message\":{\"content\":"
+                + new ObjectMapper().writeValueAsString(STRUCTURED_CONTENT)
+                + "},\"done\":false}\n"
+                + "{\"message\":{\"content\":\"\"},\"done\":true,"
+                + "\"done_reason\":\"stop\",\"eval_count\":31}\n";
+
+        assertAcceptedStructuredStream(LlmProvider.OLLAMA, events, 31);
+    }
 
     @ParameterizedTest
     @EnumSource(LlmProvider.class)
@@ -256,6 +354,72 @@ class LlmClientStructuredOutputTests {
                 "test-user", new LlmCompletionRequest("System", "Prompt", null, null)))
                 .isInstanceOf(LlmException.class)
                 .hasMessageContaining("intrinsic external-retrieval capabilities");
+        server.verify();
+    }
+
+    private void assertRejectedStructuredStream(
+            LlmProvider provider,
+            String events,
+            int expectedOutputTokens,
+            String expectedFailureReason
+    ) throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper()
+                .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        URI endpoint = URI.create("https://llm.test/stream");
+        LlmProperties properties = new LlmProperties(
+                true, provider, endpoint, "test-model", "test-key",
+                512, null, null, null, Duration.ofSeconds(5), false);
+        TokenUsageService tokenUsageService = mock(TokenUsageService.class);
+        LlmClient client = new LlmClient(builder.build(), properties, objectMapper, tokenUsageService);
+        JsonNode schema = objectMapper.readTree("""
+                {"type":"object","properties":{"suggestions":{"type":"array"}},"required":["suggestions"]}
+                """);
+        server.expect(requestTo(endpoint))
+                .andRespond(withSuccess(events, MediaType.TEXT_EVENT_STREAM));
+
+        assertThatThrownBy(() -> client.completeStructuredStreaming(
+                "test-user", new LlmCompletionRequest("Return JSON.", "Suggest classes.", null, null),
+                "class_suggestions", schema, ClassSuggestionLlmResponse.class,
+                ClassSuggestion.class, ignored -> { }))
+                .isInstanceOf(LlmException.class)
+                .hasMessageContaining("before completing")
+                .hasMessageContaining("provider=" + provider)
+                .hasMessageContaining("reason=" + expectedFailureReason);
+
+        verify(tokenUsageService).addOutputTokens("test-user", expectedOutputTokens);
+        server.verify();
+    }
+
+    private void assertAcceptedStructuredStream(
+            LlmProvider provider,
+            String events,
+            int expectedOutputTokens
+    ) throws Exception {
+        ObjectMapper objectMapper = new ObjectMapper()
+                .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        URI endpoint = URI.create("https://llm.test/stream");
+        LlmProperties properties = new LlmProperties(
+                true, provider, endpoint, "test-model", "test-key",
+                512, null, null, null, Duration.ofSeconds(5), false);
+        TokenUsageService tokenUsageService = mock(TokenUsageService.class);
+        LlmClient client = new LlmClient(builder.build(), properties, objectMapper, tokenUsageService);
+        JsonNode schema = objectMapper.readTree("""
+                {"type":"object","properties":{"suggestions":{"type":"array"}},"required":["suggestions"]}
+                """);
+        server.expect(requestTo(endpoint))
+                .andRespond(withSuccess(events, MediaType.TEXT_EVENT_STREAM));
+
+        ClassSuggestionLlmResponse response = client.completeStructuredStreaming(
+                "test-user", new LlmCompletionRequest("Return JSON.", "Suggest classes.", null, null),
+                "class_suggestions", schema, ClassSuggestionLlmResponse.class,
+                ClassSuggestion.class, ignored -> { });
+
+        assertThat(response.suggestions()).hasSize(1);
+        verify(tokenUsageService).addOutputTokens("test-user", expectedOutputTokens);
         server.verify();
     }
 

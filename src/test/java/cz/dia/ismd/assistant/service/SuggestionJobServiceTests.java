@@ -20,10 +20,17 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockingDetails;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -72,6 +79,51 @@ class SuggestionJobServiceTests {
         assertThat(job.classSuggestions()).containsExactly(suggestion);
         verify(tokenUsageService).ensureRequestAllowed("test-user");
         verify(classSuggestionLlmService).suggestClasses("test-user", request, List.of(legalActText));
+    }
+
+    @Test
+    void evictsCompletedJobsAndDoesNotCacheDatabaseResultsAgain() throws Exception {
+        String structuralElementId = "/eli/cz/sb/2024/1/2024-01-01/par_1";
+        ClassSuggestionJobRequest request = new ClassSuggestionJobRequest(
+                1, List.of(structuralElementId), "Osoba", null);
+        LegalActText legalActText = legalActText("2024/1/2024-01-01/par_1", "Osoba je fyzická osoba.");
+        ClassSuggestion suggestion = new ClassSuggestion(
+                "class_001", LangString.cs("Osoba"), LangString.cs("Fyzická osoba."),
+                LangString.cs("Pojem nalezený v právním textu."), TermType.CLASS,
+                List.of(), "/eli/cz/sb/2024/1");
+        SuggestionJobRepository repository = mock(SuggestionJobRepository.class);
+        AtomicReference<SuggestionJob> persistedJob = new AtomicReference<>();
+        doAnswer(invocation -> {
+            persistedJob.set(invocation.getArgument(0));
+            return null;
+        }).when(repository).update(any(SuggestionJob.class));
+        when(repository.findById(any(UUID.class)))
+                .thenAnswer(invocation -> Optional.ofNullable(persistedJob.get()));
+        when(legalActSPARQLService.retrieveLegalActTexts(List.of(structuralElementId)))
+                .thenReturn(List.of(legalActText));
+        when(classSuggestionLlmService.suggestClasses("test-user", request, List.of(legalActText)))
+                .thenReturn(List.of(suggestion));
+        SuggestionJobService persistentService = new SuggestionJobService(
+                classSuggestionLlmService, propertySuggestionLlmService,
+                relationshipSuggestionLlmService, legalActSPARQLService,
+                tokenUsageService, repository);
+
+        SuggestionJob job = persistentService.startClassJob("test-user", request);
+        awaitFinished(job);
+
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+        while (repositoryFindInvocations(repository) == 0 && System.nanoTime() < deadline) {
+            persistentService.get(job.jobId());
+            Thread.sleep(5);
+        }
+        assertThat(repositoryFindInvocations(repository)).isPositive();
+
+        clearInvocations(repository);
+        SuggestionJob restoredAgain = persistentService.get(job.jobId());
+
+        assertThat(restoredAgain.status()).isEqualTo(JobStatus.COMPLETED);
+        assertThat(restoredAgain.classSuggestions()).containsExactly(suggestion);
+        verify(repository).findById(job.jobId());
     }
 
     @Test
@@ -207,5 +259,11 @@ class SuggestionJobServiceTests {
         while (job.status() == JobStatus.IN_PROGRESS && System.nanoTime() < deadline) {
             Thread.sleep(5);
         }
+    }
+
+    private long repositoryFindInvocations(SuggestionJobRepository repository) {
+        return mockingDetails(repository).getInvocations().stream()
+                .filter(invocation -> invocation.getMethod().getName().equals("findById"))
+                .count();
     }
 }

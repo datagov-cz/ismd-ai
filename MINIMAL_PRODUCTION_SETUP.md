@@ -215,6 +215,19 @@ jq
 ```
 
 Repeat the request until the returned status is `completed` or `failed`.
+While the LLM response is streaming, each request may contain newly completed
+objects in `new_suggestions` even though the status is still `in_progress`.
+Each polling response contains all suggestions generated for the job so far,
+including suggestions returned by earlier polls. The status changes to
+`completed` only after the complete LLM response has arrived. A completed job
+therefore returns the full final suggestion list on every subsequent poll.
+
+The repository smoke-test script verifies that suggestion snapshots grow
+monotonically and repeated completed-job polls return the same final list:
+
+```bash
+./run-minimal-production-smoke-test.sh --cleanup
+```
 
 ## 7. Confirm authentication is enforced
 
@@ -235,6 +248,29 @@ Expected output:
 ```text
 401
 ```
+
+## 8. Retrieve and output the completed job response
+
+Use the completed job ID from step 5 to retrieve the final response and print
+the complete JSON returned by the API:
+
+```bash
+COMPLETED_JOB_RESPONSE=$(
+  curl --proxy '' \
+    --resolve localhost:8080:127.0.0.1 \
+    --fail-with-body --silent --show-error \
+    --get \
+    http://localhost:8080/legal-acts/class-suggestions-jobs \
+    --header "Authorization: Bearer ${ACCESS_TOKEN}" \
+    --data-urlencode "jobIds=${JOB_ID}"
+)
+
+echo "$COMPLETED_JOB_RESPONSE" | jq
+```
+
+The response contains the completed job identified by `JOB_ID`, including all
+generated terms in `new_suggestions`. This remains true when the same terms were
+already present in earlier polling responses.
 
 ## Stop and clean up
 
