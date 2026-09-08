@@ -171,6 +171,11 @@ sent legal text is permitted to be retained by the configured provider. Azure
 OpenAI custom endpoints must target `/openai/v1/responses` (or a compatible
 Responses API preview endpoint).
 
+## Aggregated vocabulary proposals
+
+Generate classes, properties and relationships in one asynchronous job with stable
+temporary refs and no final concept IRIs.
+
 ## API Docs
 
 When the server is running:

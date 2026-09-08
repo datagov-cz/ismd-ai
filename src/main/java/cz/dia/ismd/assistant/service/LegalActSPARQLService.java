@@ -55,31 +55,18 @@ public class LegalActSPARQLService {
 
     private static final String QUERY_LEGAL_ACT_CONTENT = """
             PREFIX esel: <https://slovník.gov.cz/datový/sbírka/pojem/>
-            SELECT ?zneni ?hierarchie ?poradi ?obsah
+            SELECT DISTINCT ?zneni ?hierarchie ?poradi ?obsah
             WHERE {
-              {
-                SELECT ?predek
-                WHERE {
-                  VALUES ?predek {
-                    %s
-                  }
-                }
+              VALUES ?source {
+                %s
               }
-
               {
-                SELECT ?predek ?zneni
-                WHERE {
-                  ?zneni esel:má-předka ?predek .
-                }
+                ?source esel:má-fragment-znění ?zneni .
               }
-              OPTION (
-                TRANSITIVE,
-                t_in(?predek),
-                t_out(?zneni),
-                t_min(0),
-                t_distinct,
-                t_no_cycles
-              )
+              UNION
+              {
+                ?zneni esel:má-předka* ?source .
+              }
 
               ?zneni
                 esel:hierarchie-fragmentu-znění-právního-aktu ?hierarchie ;
@@ -124,6 +111,12 @@ public class LegalActSPARQLService {
         Map<String, LegalActText> textsByPath = new LinkedHashMap<>();
         List<ParsedEli> cacheMisses = new ArrayList<>();
         for (ParsedEli identifier : identifiersByPath.values()) {
+            // Cached fragments do not prove that the complete version was fetched.
+            // Resolve its full membership upstream and reuse existing rows below.
+            if (identifier.path().equals(identifier.legalActPath())) {
+                cacheMisses.add(identifier);
+                continue;
+            }
             List<LegalActText> cachedTexts = legalActTextService.findByPathPrefix(identifier.path());
             if (cachedTexts.isEmpty()) {
                 cacheMisses.add(identifier);
@@ -246,7 +239,7 @@ public class LegalActSPARQLService {
     }
 
     private ParsedEli parseShortEli(String path) {
-        if (path == null || path.isBlank() || !path.matches("[A-Za-z0-9_./-]+")) {
+        if (path == null || path.isBlank() || !path.matches("[A-Za-z0-9_./:-]+")) {
             throw new IllegalArgumentException("ELI path contains unsupported characters: " + path);
         }
         String[] segments = path.split("/", -1);

@@ -4,6 +4,8 @@ import cz.dia.ismd.assistant.model.suggestion.attribute.AttributeSuggestion;
 import cz.dia.ismd.assistant.model.suggestion.classsuggestion.ClassSuggestion;
 import cz.dia.ismd.assistant.model.suggestion.relationship.RelationshipSuggestion;
 
+import cz.dia.ismd.assistant.model.suggestion.vocabulary.VocabularyDraft;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.ArrayList;
@@ -16,6 +18,7 @@ public class SuggestionJob {
     private final String selectedClassId;
     private final Instant createdAt;
     private volatile JobStatus status;
+    private volatile VocabularyDraft vocabularyDraft = VocabularyDraft.empty();
     private volatile List<ClassSuggestion> classSuggestions;
     private volatile List<AttributeSuggestion> attributeSuggestions;
     private volatile List<RelationshipSuggestion> relationshipSuggestions;
@@ -101,6 +104,18 @@ public class SuggestionJob {
 
     public synchronized void completeRelationships(List<RelationshipSuggestion> suggestions) {
         addMissingRelationships(suggestions);
+        this.status = JobStatus.COMPLETED;
+    }
+
+    public VocabularyDraft vocabularyDraft() {
+        return vocabularyDraft;
+    }
+
+    public synchronized void updateVocabularyDraft(VocabularyDraft draft) {
+        this.vocabularyDraft = draft;
+    }
+
+    public synchronized void completeVocabulary() {
         this.status = JobStatus.COMPLETED;
     }
 

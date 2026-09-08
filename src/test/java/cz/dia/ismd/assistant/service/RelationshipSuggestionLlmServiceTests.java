@@ -1,6 +1,7 @@
 package cz.dia.ismd.assistant.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import cz.dia.ismd.assistant.api.suggestion.relationship.RelationshipSuggestionJobRequest;
 import cz.dia.ismd.assistant.model.legal.LegalActText;
@@ -38,9 +39,12 @@ class RelationshipSuggestionLlmServiceTests {
         service.suggestRelationships("test-user", request, List.of(source));
 
         ArgumentCaptor<LlmCompletionRequest> completionRequest = ArgumentCaptor.forClass(LlmCompletionRequest.class);
+        ArgumentCaptor<JsonNode> schema = ArgumentCaptor.forClass(JsonNode.class);
         verify(llmClient).completeStructured(
                 eq("test-user"), completionRequest.capture(), eq("relationship_suggestions"),
-                any(), eq(RelationshipSuggestionLlmResponse.class));
+                schema.capture(), eq(RelationshipSuggestionLlmResponse.class));
+        assertThat(schema.getValue().at("/properties/suggestions/maxItems").asInt()).isEqualTo(request.effectiveK());
+        assertThat(schema.getValue().at("/properties/suggestions/items/properties/source_class/properties/id/enum")).isEqualTo(objectMapper.createArrayNode().add(request.selectedClassId()));
         String promptJson = completionRequest.getValue().prompt().substring(
                 completionRequest.getValue().prompt().indexOf('{'));
         var prompt = objectMapper.readTree(promptJson);
