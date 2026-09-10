@@ -63,13 +63,15 @@ class VocabularyEditingTests {
     }
 
     @Test
-    void expandsClassesWithoutChildrenAndMapsRepeatedClassToKnownRef() {
+    void expandsClassesWithoutChildrenAndKeepsSameNamedClassDistinctFromKnownRef() {
         when(classes.suggestClasses(anyString(), any(), any())).thenReturn(List.of(
                 new ClassSuggestion("duplicate", LangString.cs("Řidič"), null, null, TermType.CLASS, List.of(), SOURCE),
                 new ClassSuggestion("new", LangString.cs("Profesionální řidič"), null, null, TermType.CLASS, List.of(id("duplicate")), SOURCE)));
         orchestrator.expand("user", expansion(VocabularyExpansionJobRequest.Kind.CLASSES, null, known), texts, results::add);
-        assertThat(last().classes()).hasSize(1);
-        assertThat(last().classes().get(0).specializes().get(0).ref()).isEqualTo("driver");
+        assertThat(last().classes()).hasSize(2);
+        String generatedDriver = last().classes().get(0).ref();
+        assertThat(generatedDriver).isNotEqualTo("driver");
+        assertThat(last().classes().get(1).specializes().get(0).ref()).isEqualTo(generatedDriver);
         verifyNoInteractions(properties, relationships);
     }
 

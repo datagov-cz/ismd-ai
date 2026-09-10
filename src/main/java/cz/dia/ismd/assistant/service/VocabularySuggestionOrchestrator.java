@@ -65,28 +65,20 @@ final class VocabularySuggestionOrchestrator {
                                  Session session) {
         List<ClassSuggestion> generated = batch(classes.suggestClasses(userId, request, texts), request.effectiveK());
         // Allocate every class ref before resolving specialization, including forward references.
+        // Names (even with matching types/definitions) do not establish concept identity.
+        // Keep each suggestion distinct and resolve references only by explicit IDs.
         Map<String, String> classRefs = new HashMap<>();
-        List<ClassSuggestion> newClasses = new ArrayList<>();
         Set<String> providerIds = new HashSet<>();
-        Map<String, ConceptReference> names = new HashMap<>();
-        session.knownClasses.forEach(c -> { if (c.name() != null) names.put(normalizedName(c.name()), knownReference(c.termID())); });
         for (ClassSuggestion c : generated) {
             if (c == null || c.suggestionID() == null || c.suggestionID().isBlank()
                     || session.usedIds.contains(c.suggestionID()) || !providerIds.add(c.suggestionID())) {
                 throw new LlmException("Generated class identifiers must be non-blank, unique and distinct from known terms");
             }
             name(c.name());
-            ConceptReference existing = names.get(normalizedName(c.name()));
-            if (existing != null) {
-                session.classReferences.put(c.suggestionID(), existing);
-                continue;
-            }
             String ref = session.newRef("class");
             classRefs.put(c.suggestionID(), ref);
-            names.put(normalizedName(c.name()), new ConceptReference(ref, null));
-            newClasses.add(c);
         }
-        for (ClassSuggestion c : newClasses) {
+        for (ClassSuggestion c : generated) {
             String ref = classRefs.get(c.suggestionID());
             List<ConceptReference> specializes = list(c.specializes()).stream()
                     .map(id -> session.resolveGeneratedClass(id, classRefs)).toList();

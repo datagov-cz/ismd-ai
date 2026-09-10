@@ -2,6 +2,7 @@ package cz.dia.ismd.assistant.service;
 
 import cz.dia.ismd.assistant.api.suggestion.attribute.PropertySuggestionJobRequest;
 import cz.dia.ismd.assistant.api.suggestion.relationship.RelationshipSuggestionJobRequest;
+import cz.dia.ismd.assistant.api.suggestion.vocabulary.VocabularyExpansionJobRequest;
 import cz.dia.ismd.assistant.api.suggestion.vocabulary.VocabularySuggestionJobRequest;
 import cz.dia.ismd.assistant.exception.InvalidVocabularyRequestException;
 import cz.dia.ismd.assistant.exception.LlmException;
@@ -11,9 +12,14 @@ import cz.dia.ismd.assistant.model.suggestion.attribute.AttributeSuggestion;
 import cz.dia.ismd.assistant.model.suggestion.classsuggestion.ClassSuggestion;
 import cz.dia.ismd.assistant.model.suggestion.classsuggestion.KnownClassTerm;
 import cz.dia.ismd.assistant.model.suggestion.relationship.RelationshipSuggestion;
+import cz.dia.ismd.assistant.model.suggestion.vocabulary.ConceptReference;
 import cz.dia.ismd.assistant.model.suggestion.vocabulary.VocabularyDraft;
 import cz.dia.ismd.assistant.model.suggestion.vocabulary.VocabularyDraft.Phase;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -34,6 +40,102 @@ class VocabularySuggestionOrchestratorTests {
             new VocabularySuggestionOrchestrator(classes, properties, relationships);
     private final List<VocabularyDraft> snapshots = new ArrayList<>();
     private final List<LegalActText> texts = List.of(new LegalActText(1L, 1L, SOURCE, "Text zákona", "paragraph", "1"));
+
+    @ParameterizedTest
+    @CsvSource({"false, false", "false, true", "true, false", "true, true"})
+    void sameNamedKnownClassesNeverRedirectGeneratedSpecialization(boolean expand, boolean reverseKnownOrder) {
+        var subject = new KnownClassTerm("osoba-subjekt", LangString.cs("Osoba"), null, null,
+                TermType.SUBJECT, List.of(), SOURCE);
+        var object = new KnownClassTerm("osoba-objekt", LangString.cs("Osoba"), null, null,
+                TermType.OBJECT, List.of(), SOURCE);
+        var known = new KnownConceptualModel(reverseKnownOrder ? List.of(object, subject) : List.of(subject, object),
+                List.of(), List.of());
+        when(classes.suggestClasses(anyString(), any(), any())).thenReturn(List.of(
+                new ClassSuggestion("navrh-1", LangString.cs("Osoba"), null, null, TermType.SUBJECT, List.of(), SOURCE),
+                new ClassSuggestion("navrh-2", LangString.cs("Řidič"), null, null, TermType.SUBJECT,
+                        List.of(new IdReference("navrh-1"), new IdReference("osoba-subjekt")), SOURCE)));
+
+        var result = generateOrExpand(expand, 2, known);
+
+        assertThat(result.classes()).hasSize(2);
+        var person = result.classes().get(0);
+        assertThat(person.type()).isEqualTo(TermType.SUBJECT);
+        assertThat(person.ref()).isNotIn("osoba-subjekt", "osoba-objekt");
+        assertThat(result.classes().get(1).specializes()).containsExactly(
+                new ConceptReference(person.ref(), null), new ConceptReference("osoba-subjekt", null));
+        verifyNoInteractions(properties, relationships);
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void sameNameAndTypeDoNotProveIdentityWithKnownClass(boolean expand) {
+        var known = new KnownConceptualModel(List.of(new KnownClassTerm(EXISTING, LangString.cs("Osoba"),
+                LangString.cs("Osoba evidovaná v registru obyvatel."), null, TermType.SUBJECT, List.of(), SOURCE)),
+                List.of(), List.of());
+        var definition = LangString.cs("Osoba vystupující jako účastník řízení.");
+        when(classes.suggestClasses(anyString(), any(), any())).thenReturn(List.of(
+                new ClassSuggestion("person", LangString.cs("Osoba"), definition, null, TermType.SUBJECT, List.of(), SOURCE),
+                cls("child", List.of(new IdReference("person"), new IdReference(EXISTING)))));
+
+        var result = generateOrExpand(expand, 2, known);
+
+        assertThat(result.classes()).hasSize(2);
+        assertThat(result.classes().get(0).definition()).isEqualTo(definition);
+        assertThat(result.classes().get(1).specializes()).containsExactly(
+                new ConceptReference(result.classes().get(0).ref(), null), new ConceptReference(null, EXISTING));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false, Řidič vozidla", "true, Řidič vozidla",
+            "false, ' R\u030cIDIC\u030c   VOZIDLA '", "true, ' R\u030cIDIC\u030c   VOZIDLA '"})
+    void sameNamedGeneratedClassesKeepTheirOwnIdsIncludingForwardReferences(boolean expand, String secondName) {
+        when(classes.suggestClasses(anyString(), any(), any())).thenReturn(List.of(
+                new ClassSuggestion("first", LangString.cs("Řidič vozidla"), LangString.cs("Řidič silničního vozidla."),
+                        null, TermType.SUBJECT, List.of(), SOURCE),
+                cls("child", List.of(new IdReference("second"), new IdReference("first"))),
+                new ClassSuggestion("second", LangString.cs(secondName), LangString.cs("Řidič drážního vozidla."),
+                        null, TermType.SUBJECT, List.of(), SOURCE)));
+
+        var result = generateOrExpand(expand, 3, new KnownConceptualModel(List.of(), List.of(), List.of()));
+
+        assertThat(result.classes()).hasSize(3);
+        assertThat(result.classes()).extracting(VocabularyDraft.DraftClass::ref).doesNotHaveDuplicates();
+        assertThat(result.classes().get(1).specializes()).containsExactly(
+                new ConceptReference(result.classes().get(2).ref(), null),
+                new ConceptReference(result.classes().get(0).ref(), null));
+        assertThat(result.classes().get(0).definition()).isEqualTo(LangString.cs("Řidič silničního vozidla."));
+        assertThat(result.classes().get(2).definition()).isEqualTo(LangString.cs("Řidič drážního vozidla."));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void sameNamedClassStillRejectsSelfSpecialization(boolean expand) {
+        var known = new KnownConceptualModel(List.of(known(EXISTING)), List.of(), List.of());
+        when(classes.suggestClasses(anyString(), any(), any())).thenReturn(List.of(
+                new ClassSuggestion("self", known(EXISTING).name(), null, null, TermType.CLASS,
+                        List.of(new IdReference("self")), SOURCE)));
+
+        assertThatThrownBy(() -> generateOrExpand(expand, 1, known)).isInstanceOf(LlmException.class)
+                .hasMessageContaining("cannot specialize itself");
+        assertThat(snapshots).isEmpty();
+        verifyNoInteractions(properties, relationships);
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {" ", EXISTING})
+    void rejectsInvalidClassIdsEvenWhenNameMatchesKnownClass(String invalidId) {
+        var known = new KnownConceptualModel(List.of(known(EXISTING)), List.of(), List.of());
+        when(classes.suggestClasses(anyString(), any(), any())).thenReturn(List.of(
+                new ClassSuggestion(invalidId, known(EXISTING).name(), null, null, TermType.CLASS, List.of(), SOURCE)));
+
+        assertThatThrownBy(() -> generateOrExpand(false, 1, known)).isInstanceOf(LlmException.class)
+                .hasMessageContaining("identifiers");
+        assertThatThrownBy(() -> generateOrExpand(true, 1, known)).isInstanceOf(LlmException.class)
+                .hasMessageContaining("identifiers");
+        assertThat(snapshots).isEmpty();
+        verifyNoInteractions(properties, relationships);
+    }
 
     @Test
     void linksForwardSpecializationAndPassesAllClassesAndGeneratedTermsToSubsequentCalls() {
@@ -117,10 +219,12 @@ class VocabularySuggestionOrchestratorTests {
         verifyNoInteractions(relationships);
     }
 
-    @Test
-    void rejectsAmbiguousClassIdsBeforePublishingAnything() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void rejectsAmbiguousClassIdsBeforePublishingAnything(boolean expand) {
         when(classes.suggestClasses(anyString(), any(), any())).thenReturn(List.of(cls("a", List.of()), cls("a", List.of())));
-        assertThatThrownBy(() -> generate(request(2, 1, 1, null))).isInstanceOf(LlmException.class);
+        assertThatThrownBy(() -> generateOrExpand(expand, 2, new KnownConceptualModel(List.of(), List.of(), List.of())))
+                .isInstanceOf(LlmException.class).hasMessageContaining("identifiers");
         assertThat(snapshots).isEmpty();
         verifyNoInteractions(properties, relationships);
     }
@@ -186,6 +290,17 @@ class VocabularySuggestionOrchestratorTests {
 
     private void generate(VocabularySuggestionJobRequest request) {
         orchestrator.generate("user", request, texts, snapshots::add);
+    }
+
+    private VocabularyDraft generateOrExpand(boolean expand, int count, KnownConceptualModel known) {
+        if (expand) {
+            var request = new VocabularyExpansionJobRequest(VocabularyExpansionJobRequest.Kind.CLASSES,
+                    count, null, null, "Vozidla", known).forLegalAct(2024, 1, LocalDate.of(2024, 1, 1));
+            orchestrator.expand("user", request, texts, snapshots::add);
+        } else {
+            generate(request(count, 0, 0, known));
+        }
+        return snapshots.get(snapshots.size() - 1);
     }
 
     private VocabularySuggestionJobRequest request(int count, int props, int rels, KnownConceptualModel known) {
