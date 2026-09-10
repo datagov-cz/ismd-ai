@@ -2,9 +2,11 @@ package cz.dia.ismd.assistant.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.dia.ismd.assistant.api.suggestion.relationship.RelationshipSuggestionJobRequest;
+import cz.dia.ismd.assistant.api.suggestion.vocabulary.VocabularyRegenerationJobRequest;
 import cz.dia.ismd.assistant.model.legal.LegalActText;
 import cz.dia.ismd.assistant.model.llm.LlmCompletionRequest;
 import cz.dia.ismd.assistant.model.llm.RelationshipSuggestionLlmResponse;
+import cz.dia.ismd.assistant.model.suggestion.relationship.KnownRelationshipTerm;
 import cz.dia.ismd.assistant.model.suggestion.relationship.RelationshipSuggestion;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +22,7 @@ public class RelationshipSuggestionLlmService {
             A relationship connects an instance of the source class to an instance of the target class.
             Value-bearing characteristics such as text, numbers, dates, or booleans belong to attributes and
             must not be returned as relationships. Do not invent a target class for a literal value.
-
+            
             Every source_class.id must equal request.selected_class_id exactly. Both source_class.id and
             target_class.id must be existing termID values in request.known_conceptual_model.classes.
             Name each relationship as a specific predicate read from source to target, rather than a generic
@@ -31,14 +33,14 @@ public class RelationshipSuggestionLlmService {
             by --> driver may both be valid. This example illustrates direction only; generate such a relationship
             only when supported by the supplied source. Do not reject a candidate merely because the reverse
             direction already exists in the known model.
-
+            
             Use the known model as context, not as a list of outputs to repeat. Do not propose the same relationship
             meaning for the same directed source and target if already present, even under a synonymous name.
             Different relationship meanings between the same classes may be valid. Prior suggestions are not
             independent evidence from the legal text; do not copy their wording without source support.
             Return fewer than request.k suggestions, including an empty array, if no further supported
             relationships exist. Do not invent a relationship to fill the count.
-
+            
             Each source has a path and legal_text; use its supplied path as the legal_act reference.
             Use Czech localized names, definitions and explanations, grounded in the supplied source.
             """;
@@ -76,8 +78,8 @@ public class RelationshipSuggestionLlmService {
     }
 
     public List<ConceptRegenerationLlmService.Metadata> regenerate(String userId,
-            cz.dia.ismd.assistant.api.suggestion.vocabulary.VocabularyRegenerationJobRequest request,
-            cz.dia.ismd.assistant.model.suggestion.relationship.KnownRelationshipTerm target, List<LegalActText> texts) {
+                                                                   VocabularyRegenerationJobRequest request,
+                                                                   KnownRelationshipTerm target, List<LegalActText> texts) {
         return ConceptRegenerationLlmService.regenerate(llmClient, objectMapper, userId, ConceptRegenerationLlmService.Kind.RELATIONSHIP, target, request, texts);
     }
 

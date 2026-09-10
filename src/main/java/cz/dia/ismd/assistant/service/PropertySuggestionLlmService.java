@@ -2,10 +2,12 @@ package cz.dia.ismd.assistant.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import cz.dia.ismd.assistant.api.suggestion.attribute.PropertySuggestionJobRequest;
+import cz.dia.ismd.assistant.api.suggestion.vocabulary.VocabularyRegenerationJobRequest;
 import cz.dia.ismd.assistant.model.legal.LegalActText;
 import cz.dia.ismd.assistant.model.llm.LlmCompletionRequest;
 import cz.dia.ismd.assistant.model.llm.PropertySuggestionLlmResponse;
 import cz.dia.ismd.assistant.model.suggestion.attribute.AttributeSuggestion;
+import cz.dia.ismd.assistant.model.suggestion.attribute.KnownAttributeTerm;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -26,13 +28,13 @@ public class PropertySuggestionLlmService {
             those mentioned in conditions, limits or inspection duties. The measurable characteristic may be an
             attribute; the act of inspecting it is not. Preserve the source's scope and conditions instead of
             applying a threshold from a particular situation to every instance of the class.
-
+            
             Illustrative distinctions, not additional source evidence:
             - A vehicle's colour can be an attribute if the supplied text supports it.
             - A driver driving a vehicle is a relationship and must not appear in this response.
             - If the source only defines driver and vehicle and connects them by driving, without describing
               any value-bearing characteristics, return {"suggestions":[]} for the attribute step.
-
+            
             Find the selected class in request.known_conceptual_model.classes by its termID.
             Every associated_class.id must equal request.selected_class_id exactly.
             Use the known model as context, not as a list of outputs to repeat. Do not propose an attribute
@@ -40,7 +42,7 @@ public class PropertySuggestionLlmService {
             An attribute belonging to a different class is not automatically a duplicate, but a new proposal
             still needs source evidence for the selected class. Known relationships must not be copied into
             attributes. Prior suggestions are not independent evidence from the legal text.
-
+            
             Return fewer than request.k suggestions, including an empty array, whenever the source does not
             support enough new attributes. Never invent an attribute to fill the requested count.
             Each source has a path and legal_text; use its supplied path as the legal_act reference.
@@ -81,8 +83,8 @@ public class PropertySuggestionLlmService {
     }
 
     public List<ConceptRegenerationLlmService.Metadata> regenerate(String userId,
-            cz.dia.ismd.assistant.api.suggestion.vocabulary.VocabularyRegenerationJobRequest request,
-            cz.dia.ismd.assistant.model.suggestion.attribute.KnownAttributeTerm target, List<LegalActText> texts) {
+                                                                   VocabularyRegenerationJobRequest request,
+                                                                   KnownAttributeTerm target, List<LegalActText> texts) {
         return ConceptRegenerationLlmService.regenerate(llmClient, objectMapper, userId, ConceptRegenerationLlmService.Kind.ATTRIBUTE, target, request, texts);
     }
 
