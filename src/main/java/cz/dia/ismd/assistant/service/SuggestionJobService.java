@@ -14,6 +14,7 @@ import cz.dia.ismd.assistant.model.job.JobKind;
 import cz.dia.ismd.assistant.model.job.JobStatus;
 import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.model.legal.LegalActText;
+import cz.dia.ismd.assistant.model.legal.LegalActEli;
 import cz.dia.ismd.assistant.model.suggestion.attribute.AttributeSuggestion;
 import cz.dia.ismd.assistant.model.suggestion.classsuggestion.ClassSuggestion;
 import cz.dia.ismd.assistant.model.suggestion.relationship.RelationshipSuggestion;
@@ -41,7 +42,6 @@ import java.util.stream.Collectors;
 public class SuggestionJobService {
 
     private static final Logger log = LoggerFactory.getLogger(SuggestionJobService.class);
-    private static final String ELI_PATH_PREFIX = "/eli/cz/sb/";
 
     private final ClassSuggestionLlmService classSuggestionLlmService;
     private final PropertySuggestionLlmService propertySuggestionLlmService;
@@ -286,13 +286,7 @@ public class SuggestionJobService {
     }
 
     private boolean belongsTo(String identifier, String retrievedPath) {
-        String requestedPath = identifier;
-        int prefixIndex = requestedPath.lastIndexOf(ELI_PATH_PREFIX);
-        if (prefixIndex >= 0) {
-            requestedPath = requestedPath.substring(prefixIndex + ELI_PATH_PREFIX.length());
-        } else if (requestedPath.startsWith("/")) {
-            requestedPath = requestedPath.substring(1);
-        }
+        String requestedPath = LegalActEli.parse(identifier).path();
         return retrievedPath.equals(requestedPath) || retrievedPath.startsWith(requestedPath + "/");
     }
 

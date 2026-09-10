@@ -31,7 +31,7 @@ class VocabularyEditingTests {
             List.of(new KnownRelationshipTerm("drives", id("driver"), id("vehicle"), LangString.cs("řídí"), null, null, SOURCE)));
 
     @Test
-    void expandsOnlyPropertiesUsingEntireCurrentModelAndSuppressesRepeatedNames() {
+    void expandsOnlyPropertiesUsingEntireCurrentModelAndPreservesRepeatedNames() {
         when(properties.suggestProperties(anyString(), any(), any())).thenAnswer(inv -> {
             var r = inv.getArgument(1, cz.dia.ismd.assistant.api.suggestion.attribute.PropertySuggestionJobRequest.class);
             assertThat(r.knownConceptualModel()).isEqualTo(known);
@@ -40,8 +40,10 @@ class VocabularyEditingTests {
         });
         orchestrator.expand("user", expansion(VocabularyExpansionJobRequest.Kind.PROPERTIES, "vehicle", known), texts, results::add);
         var delta = last();
-        assertThat(delta.attributes()).hasSize(1);
-        assertThat(delta.attributes().get(0).name()).isEqualTo(LangString.cs("Výkon"));
+        assertThat(delta.attributes()).hasSize(3);
+        assertThat(delta.attributes()).extracting(a -> a.name().values().get("cs"))
+                .containsExactly(" OBJEM   VÁLCŮ ", "Výkon", "výkon");
+        assertThat(delta.attributes()).extracting(a -> a.ref()).doesNotHaveDuplicates();
         assertThat(delta.attributes().get(0).ref()).startsWith("attribute-");
         assertThat(delta.attributes().get(0).associatedClass().ref()).isEqualTo("vehicle");
         assertThat(delta.classes()).isEmpty(); assertThat(delta.relationships()).isEmpty();
@@ -50,7 +52,7 @@ class VocabularyEditingTests {
     }
 
     @Test
-    void allowsReverseDirectionAndDifferentPredicatesButNotSameDirectedDuplicate() {
+    void preservesRelationshipsRegardlessOfMatchingNamesAndEndpoints() {
         when(relationships.suggestRelationships(anyString(), any(), any())).thenReturn(List.of(
                 relation("vehicle", "driver", "řídí"), relation("vehicle", "driver", "je řízeno")));
         orchestrator.expand("user", expansion(VocabularyExpansionJobRequest.Kind.RELATIONSHIPS, "vehicle", known), texts, results::add);
@@ -58,8 +60,45 @@ class VocabularyEditingTests {
         when(relationships.suggestRelationships(anyString(), any(), any())).thenReturn(List.of(
                 relation("driver", "vehicle", " ŘÍDÍ "), relation("driver", "vehicle", "vlastní")));
         orchestrator.expand("user", expansion(VocabularyExpansionJobRequest.Kind.RELATIONSHIPS, "driver", known), texts, results::add);
-        assertThat(last().relationships()).extracting(r -> r.name().values().get("cs")).containsExactly("vlastní");
+        assertThat(last().relationships()).extracting(r -> r.name().values().get("cs")).containsExactly(" ŘÍDÍ ", "vlastní");
         verifyNoInteractions(classes, properties);
+    }
+
+    @Test
+    void expansionPreservesDifferentMeaningsWithSameNamesAsKnownAndGeneratedTerms() {
+        var mass = LangString.cs("Hmotnost");
+        var relationName = LangString.cs("užívá");
+        var current = new KnownConceptualModel(known.classes(),
+                List.of(new KnownAttributeTerm("known-mass", id("vehicle"), mass,
+                        LangString.cs("Hmotnost nákladu."), null, SOURCE)),
+                List.of(new KnownRelationshipTerm("known-use", id("driver"), id("vehicle"), relationName,
+                        LangString.cs("Užívání při výcviku."), null, SOURCE)));
+        var operating = LangString.cs("Provozní hmotnost vozidla.");
+        var maximum = LangString.cs("Maximální přípustná hmotnost vozidla.");
+        when(properties.suggestProperties(anyString(), any(), any())).thenReturn(List.of(
+                new AttributeSuggestion("a1", id("vehicle"), mass, operating, null, SOURCE),
+                new AttributeSuggestion("a2", id("vehicle"), mass, maximum, null, SOURCE)));
+
+        orchestrator.expand("user", expansion(VocabularyExpansionJobRequest.Kind.PROPERTIES, "vehicle", current), texts, results::add);
+        assertThat(last().attributes()).extracting(a -> a.definition()).containsExactly(operating, maximum);
+        assertThat(last().attributes()).extracting(a -> a.ref()).doesNotHaveDuplicates().doesNotContain("known-mass");
+        assertThat(last().attributes()).allSatisfy(a -> assertThat(a.associatedClass().ref()).isEqualTo("vehicle"));
+
+        var work = LangString.cs("Užívání pro výkon zaměstnání.");
+        var privateUse = LangString.cs("Užívání pro soukromé účely.");
+        when(relationships.suggestRelationships(anyString(), any(), any())).thenReturn(List.of(
+                new RelationshipSuggestion("r1", id("driver"), id("vehicle"), relationName, work, null, SOURCE),
+                new RelationshipSuggestion("r2", id("driver"), id("vehicle"), relationName, privateUse, null, SOURCE)));
+        orchestrator.expand("user", expansion(VocabularyExpansionJobRequest.Kind.RELATIONSHIPS, "driver", current), texts, results::add);
+        assertThat(last().relationships()).extracting(r -> r.definition()).containsExactly(work, privateUse);
+        assertThat(last().relationships()).extracting(r -> r.ref()).doesNotHaveDuplicates().doesNotContain("known-use");
+        assertThat(last().relationships()).allSatisfy(r -> {
+            assertThat(r.sourceClass().ref()).isEqualTo("driver");
+            assertThat(r.targetClass().ref()).isEqualTo("vehicle");
+        });
+        assertThat(current.attributes()).hasSize(1);
+        assertThat(current.relationships()).hasSize(1);
+        verifyNoInteractions(classes);
     }
 
     @Test
@@ -95,7 +134,7 @@ class VocabularyEditingTests {
 
     @Test
     void expansionWithNoNewResultsCompletesWithEmptyDelta() {
-        when(properties.suggestProperties(anyString(), any(), any())).thenReturn(List.of(attr("Objem válců")));
+        when(properties.suggestProperties(anyString(), any(), any())).thenReturn(List.of());
         orchestrator.expand("user", expansion(VocabularyExpansionJobRequest.Kind.PROPERTIES, "vehicle", known), texts, results::add);
         assertThat(last().attributes()).isEmpty();
         assertThat(last().phase()).isEqualTo(VocabularyDraft.Phase.DONE);

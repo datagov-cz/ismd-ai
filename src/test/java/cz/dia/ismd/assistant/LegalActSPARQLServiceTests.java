@@ -36,6 +36,24 @@ class LegalActSPARQLServiceTests {
     private static final String ELI_PATH =
             "2026/60/2026-05-27/dokument/norma/cast_1/hlava_3/par_16/odst_2/pism_g";
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+            "/eli/cz/sb/2024/1/2024-01-01/eli/cz/sb/2025/2/2025-01-01/par_2",
+            "https://e-sbirka.gov.cz/eli/cz/sb/2024/1/2024-01-01/eli/cz/sb/2024/1/2024-01-01/par_2"
+    })
+    void rejectsAmbiguousEliBeforeReadingDatabaseOrSparql(String identifier) {
+        SparqlQueryExecutor executor = mock(SparqlQueryExecutor.class);
+        Environment environment = mock(Environment.class);
+        LegalActService acts = mock(LegalActService.class);
+        LegalActTextService texts = mock(LegalActTextService.class);
+        var service = new LegalActSPARQLService(executor, environment, acts, texts);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.retrieveLegalActTexts(List.of(identifier)))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.retrieveLegalActInfo(identifier))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.mockito.Mockito.verifyNoInteractions(executor, environment, acts, texts);
+    }
+
     @Test
     @SuppressWarnings("unchecked")
     void retrievesFullEliFromSparqlAndCachesMappedText() {

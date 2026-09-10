@@ -41,6 +41,37 @@ class VocabularySuggestionOrchestratorTests {
     private final List<VocabularyDraft> snapshots = new ArrayList<>();
     private final List<LegalActText> texts = List.of(new LegalActText(1L, 1L, SOURCE, "Text zákona", "paragraph", "1"));
 
+    @Test
+    void fullGenerationPreservesSameNamedPropertiesAndRelationshipsWithDistinctMeanings() {
+        when(classes.suggestClasses(anyString(), any(), any())).thenReturn(List.of(cls("vehicle", List.of())));
+        var operating = LangString.cs("Provozní hmotnost.");
+        var maximum = LangString.cs("Maximální přípustná hmotnost.");
+        when(properties.suggestProperties(anyString(), any(), any())).thenAnswer(inv -> {
+            PropertySuggestionJobRequest r = inv.getArgument(1);
+            return List.of(
+                    new AttributeSuggestion("a1", new IdReference(r.selectedClassId()), LangString.cs("Hmotnost"), operating, null, SOURCE),
+                    new AttributeSuggestion("a2", new IdReference(r.selectedClassId()), LangString.cs("Hmotnost"), maximum, null, SOURCE));
+        });
+        var work = LangString.cs("Užívání pro práci.");
+        var privateUse = LangString.cs("Užívání soukromě.");
+        when(relationships.suggestRelationships(anyString(), any(), any())).thenAnswer(inv -> {
+            RelationshipSuggestionJobRequest r = inv.getArgument(1);
+            assertThat(r.knownConceptualModel().attributes()).extracting(a -> a.definition()).containsExactly(operating, maximum);
+            return List.of(
+                    new RelationshipSuggestion("r1", new IdReference(r.selectedClassId()), new IdReference(EXISTING),
+                            LangString.cs("je užíváno"), work, null, SOURCE),
+                    new RelationshipSuggestion("r2", new IdReference(r.selectedClassId()), new IdReference(EXISTING),
+                            LangString.cs("je užíváno"), privateUse, null, SOURCE));
+        });
+        generate(request(1, 2, 2, new KnownConceptualModel(List.of(known(EXISTING)), null, null)));
+        var result = snapshots.get(snapshots.size() - 1);
+        assertThat(result.phase()).isEqualTo(Phase.DONE);
+        assertThat(result.attributes()).extracting(a -> a.definition()).containsExactly(operating, maximum);
+        assertThat(result.relationships()).extracting(r -> r.definition()).containsExactly(work, privateUse);
+        assertThat(result.attributes()).extracting(a -> a.ref()).doesNotHaveDuplicates();
+        assertThat(result.relationships()).extracting(r -> r.ref()).doesNotHaveDuplicates();
+    }
+
     @ParameterizedTest
     @CsvSource({"false, false", "false, true", "true, false", "true, true"})
     void sameNamedKnownClassesNeverRedirectGeneratedSpecialization(boolean expand, boolean reverseKnownOrder) {

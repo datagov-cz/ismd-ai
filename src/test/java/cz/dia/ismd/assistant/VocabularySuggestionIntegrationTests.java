@@ -175,6 +175,25 @@ class VocabularySuggestionIntegrationTests extends AssistantIntegrationTest {
     }
 
     @Test
+    void rejectsRepeatedEliInAllVocabularyEndpointsBeforeCreatingJobOrLoadingTexts() throws Exception {
+        String source = "/eli/cz/sb/2024/1/2024-01-01/eli/cz/sb/2025/2/2025-01-01/par_2";
+        int before = jdbcTemplate.queryForObject("SELECT count(*) FROM suggestion_jobs", Integer.class);
+        for (String suffix : List.of("", "/expand", "/regenerate")) {
+            var body = mapper.createObjectNode();
+            body.putArray("structural_element_ids").add(source);
+            body.set("known_conceptual_model", mapper.readTree(WORKING_MODEL));
+            if (suffix.equals("/expand")) body.put("kind", "classes");
+            if (suffix.equals("/regenerate")) body.put("concept_ref", "draft-car");
+            mockMvc.perform(post(POST + suffix).with(oidcAuthentication())
+                            .contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+        assertThat(jdbcTemplate.queryForObject("SELECT count(*) FROM suggestion_jobs", Integer.class)).isEqualTo(before);
+        verifyNoInteractions(legalActSPARQLService, classSuggestionLlmService,
+                propertySuggestionLlmService, relationshipSuggestionLlmService);
+    }
+
+    @Test
     void validatesCountsElementsKnownIdsAndLegalActVersionBeforeStarting() throws Exception {
         for (String body : List.of("{\"class_count\":0}", "{\"properties_per_class\":11}",
                 "{\"relationships_per_class\":-1}", "{\"structural_element_ids\":[\"§1\"]}",

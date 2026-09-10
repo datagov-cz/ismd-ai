@@ -20,7 +20,6 @@ import cz.dia.ismd.assistant.model.suggestion.vocabulary.VocabularyDraft;
 import cz.dia.ismd.assistant.model.suggestion.vocabulary.VocabularyDraft.*;
 
 import java.net.URI;
-import java.text.Normalizer;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -104,9 +103,6 @@ final class VocabularySuggestionOrchestrator {
             if (a == null) throw new LlmException("Generated property is null");
             session.requireSelectedClass(a.associatedClass(), selectedClassId);
             name(a.name());
-            if (session.knownAttributes.stream().anyMatch(known ->
-                    known.associatedClass() != null && selectedClassId.equals(known.associatedClass().id()) && sameName(known.name(), a.name()))
-                    || accepted.stream().anyMatch(known -> sameName(known.name(), a.name()))) continue;
             accepted.add(new DraftAttribute(session.newRef("attribute"), session.resolve(a.associatedClass()),
                     name(a.name()), a.definition(), a.explanation(), session.legalAct(a.legalAct())));
         }
@@ -125,11 +121,6 @@ final class VocabularySuggestionOrchestrator {
             session.requireSelectedClass(r.sourceClass(), selectedClassId);
             session.resolve(r.targetClass());
             name(r.name());
-            if (session.knownRelationships.stream().anyMatch(known ->
-                    known.sourceClass() != null && selectedClassId.equals(known.sourceClass().id())
-                            && known.targetClass() != null && r.targetClass().id().equals(known.targetClass().id()) && sameName(known.name(), r.name()))
-                    || accepted.stream().anyMatch(known -> id(known.targetClass()).id().equals(r.targetClass().id())
-                            && sameName(known.name(), r.name()))) continue;
             accepted.add(new DraftRelationship(session.newRef("relationship"), session.resolve(r.sourceClass()),
                     session.resolve(r.targetClass()), name(r.name()), r.definition(), r.explanation(),
                     session.legalAct(r.legalAct())));
@@ -138,15 +129,6 @@ final class VocabularySuggestionOrchestrator {
         accepted.forEach(r -> session.knownRelationships.add(new KnownRelationshipTerm(r.ref(), id(r.sourceClass()),
                 id(r.targetClass()), r.name(), r.definition(), r.explanation(), r.legalAct())));
         session.publish(Phase.RELATIONSHIPS);
-    }
-
-    static boolean sameName(LangString left, LangString right) {
-        return left != null && right != null && normalizedName(left).equals(normalizedName(right));
-    }
-
-    private static String normalizedName(LangString name) {
-        return Normalizer.normalize(name.values().getOrDefault("cs", ""), Normalizer.Form.NFC)
-                .strip().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
     }
 
     void expand(String userId, VocabularyExpansionJobRequest request, List<LegalActText> texts,

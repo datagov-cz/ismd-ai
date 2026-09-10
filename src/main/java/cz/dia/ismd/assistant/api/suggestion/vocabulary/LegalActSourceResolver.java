@@ -1,6 +1,7 @@
 package cz.dia.ismd.assistant.api.suggestion.vocabulary;
 
 import cz.dia.ismd.assistant.exception.InvalidVocabularyRequestException;
+import cz.dia.ismd.assistant.model.legal.LegalActEli;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -16,9 +17,13 @@ final class LegalActSourceResolver {
         if (structuralElementIds == null || structuralElementIds.isEmpty())
             return List.of("https://e-sbirka.gov.cz" + root);
         for (String element : structuralElementIds) {
-            int index = element == null ? -1 : element.indexOf("/eli/");
-            String path = index < 0 ? "" : element.substring(index);
-            if (!path.equals(root) && !path.startsWith(root + "/"))
+            LegalActEli eli;
+            try {
+                eli = LegalActEli.parse(element);
+            } catch (IllegalArgumentException exception) {
+                throw new InvalidVocabularyRequestException(exception.getMessage());
+            }
+            if (eli.year().getValue() != year || eli.number() != number || !eli.date().equals(date))
                 throw new InvalidVocabularyRequestException(
                         "structural_element_ids must belong to the legal act version in the URL");
         }
