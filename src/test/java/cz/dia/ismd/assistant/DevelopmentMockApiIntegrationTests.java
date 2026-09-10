@@ -14,6 +14,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class DevelopmentMockApiIntegrationTests extends AssistantIntegrationTest {
 
     @Test
+    void returnsLinkedVocabularyMockWithoutAuthentication() throws Exception {
+        mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/vocabulary-suggestions-jobs")
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.job_id").value("00000000-0000-0000-0000-000000000401"));
+        mockMvc.perform(get("/legal-acts/vocabulary-suggestions-jobs")
+                        .queryParam("jobIds", "00000000-0000-0000-0000-000000000401"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("completed"))
+                .andExpect(jsonPath("$[0].draft.classes", hasSize(2)))
+                .andExpect(jsonPath("$[0].draft.attributes[0].associated_class.ref").value("mock-class-vehicle"))
+                .andExpect(jsonPath("$[0].draft.relationships[0].target_class.ref").value("mock-class-person"));
+    }
+
+    @Test
     void allowsRequestsWithoutOidcAuthenticationInDevelopment() throws Exception {
         mockMvc.perform(post("/legal-acts/2024/1/2024-01-01/class-suggestions-top-k-extraction-jobs")
                         .contentType(MediaType.APPLICATION_JSON)

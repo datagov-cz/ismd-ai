@@ -1,6 +1,8 @@
 package cz.dia.ismd.assistant.api;
 
 import cz.dia.ismd.assistant.exception.JobNotFoundException;
+import cz.dia.ismd.assistant.exception.InvalidVocabularyRequestException;
+import cz.dia.ismd.assistant.exception.VocabularyJobCapacityException;
 import cz.dia.ismd.assistant.exception.JobIdsLimitExceededException;
 import cz.dia.ismd.assistant.exception.SparqlAccessException;
 import cz.dia.ismd.assistant.exception.SuggestionNotFoundException;
@@ -14,6 +16,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    @ExceptionHandler(InvalidVocabularyRequestException.class)
+    public ResponseEntity<ErrorResponse> handleVocabularyValidation(InvalidVocabularyRequestException exception) {
+        return ResponseEntity.unprocessableEntity().body(new ErrorResponse(exception.getMessage()));
+    }
+
+    @ExceptionHandler(VocabularyJobCapacityException.class)
+    public ResponseEntity<ErrorResponse> handleVocabularyCapacity(VocabularyJobCapacityException exception) {
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(new ErrorResponse(exception.getMessage()));
+    }
 
     @ExceptionHandler(JobIdsLimitExceededException.class)
     public ResponseEntity<ErrorResponse> handleJobIdsLimitExceeded(JobIdsLimitExceededException exception) {

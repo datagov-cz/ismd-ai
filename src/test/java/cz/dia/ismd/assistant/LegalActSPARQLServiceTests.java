@@ -10,6 +10,8 @@ import org.eclipse.rdf4j.model.impl.SimpleValueFactory;
 import org.eclipse.rdf4j.query.BindingSet;
 import org.eclipse.rdf4j.query.TupleQueryResult;
 import org.eclipse.rdf4j.repository.RepositoryConnection;
+import org.eclipse.rdf4j.repository.sail.SailRepository;
+import org.eclipse.rdf4j.sail.memory.MemoryStore;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.core.env.Environment;
@@ -33,6 +35,24 @@ class LegalActSPARQLServiceTests {
     private static final String NAMESPACE = "https://data.example/eli/cz/sb/";
     private static final String ELI_PATH =
             "2026/60/2026-05-27/dokument/norma/cast_1/hlava_3/par_16/odst_2/pism_g";
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {
+            "/eli/cz/sb/2024/1/2024-01-01/eli/cz/sb/2025/2/2025-01-01/par_2",
+            "https://e-sbirka.gov.cz/eli/cz/sb/2024/1/2024-01-01/eli/cz/sb/2024/1/2024-01-01/par_2"
+    })
+    void rejectsAmbiguousEliBeforeReadingDatabaseOrSparql(String identifier) {
+        SparqlQueryExecutor executor = mock(SparqlQueryExecutor.class);
+        Environment environment = mock(Environment.class);
+        LegalActService acts = mock(LegalActService.class);
+        LegalActTextService texts = mock(LegalActTextService.class);
+        var service = new LegalActSPARQLService(executor, environment, acts, texts);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.retrieveLegalActTexts(List.of(identifier)))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.retrieveLegalActInfo(identifier))
+                .isInstanceOf(IllegalArgumentException.class);
+        org.mockito.Mockito.verifyNoInteractions(executor, environment, acts, texts);
+    }
 
     @Test
     @SuppressWarnings("unchecked")
@@ -88,7 +108,7 @@ class LegalActSPARQLServiceTests {
 
         ArgumentCaptor<String> contentQuery = ArgumentCaptor.forClass(String.class);
         verify(queryExecutor).evaluateTupleQuery(any(), contentQuery.capture());
-        assertThat(contentQuery.getValue()).contains("VALUES ?predek {", "<" + NAMESPACE + ELI_PATH + ">");
+        assertThat(contentQuery.getValue()).contains("VALUES ?source {", "<" + NAMESPACE + ELI_PATH + ">");
 
         ArgumentCaptor<String> nameQuery = ArgumentCaptor.forClass(String.class);
         verify(queryExecutor).evaluateTupleQuery(any(), nameQuery.capture(), any());
@@ -144,6 +164,60 @@ class LegalActSPARQLServiceTests {
                 "arbitrary prefix with spaces /eli/cz/sb/" + ELI_PATH
         ))).containsExactly(cached);
         verify(queryExecutor, never()).query(anyString(), any());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void loadsWholeVersionDespitePartiallyCachedParagraphAndPreservesSubtreeSelection() {
+        String actPath = "2026/60/2026-05-27";
+        String paragraph = actPath + "/dokument/norma/par_1";
+        String child = paragraph + "/odst_1:2";
+        String sibling = actPath + "/dokument/norma/par_2";
+        String ns = "https://slovník.gov.cz/datový/sbírka/pojem/";
+        var vf = SimpleValueFactory.getInstance();
+        var repository = new SailRepository(new MemoryStore());
+        repository.init();
+        try (var connection = repository.getConnection()) {
+            // Version membership is separate from the fragment parent hierarchy.
+            for (String path : List.of(paragraph, child, sibling)) {
+                var fragment = vf.createIRI(NAMESPACE + path);
+                var content = vf.createIRI(NAMESPACE + path + "/content");
+                connection.add(vf.createIRI(NAMESPACE + actPath), vf.createIRI(ns + "má-fragment-znění"), fragment);
+                connection.add(fragment, vf.createIRI(ns + "obsahuje-fragment"), content);
+                connection.add(content, vf.createIRI(ns + "text-fragmentu"), vf.createLiteral(path));
+                connection.add(fragment, vf.createIRI(ns + "hierarchie-fragmentu-znění-právního-aktu"), vf.createLiteral("paragraph"));
+                connection.add(fragment, vf.createIRI(ns + "pořadí-fragmentu-znění-právního-aktu"), vf.createLiteral(path));
+            }
+            connection.add(vf.createIRI(NAMESPACE + child), vf.createIRI(ns + "má-předka"), vf.createIRI(NAMESPACE + paragraph));
+
+            var executor = mock(SparqlQueryExecutor.class);
+            when(executor.query(anyString(), any())).thenAnswer(invocation ->
+                    ((Function<RepositoryConnection, Object>) invocation.getArgument(1)).apply(connection));
+            when(executor.evaluateTupleQuery(any(), anyString())).thenAnswer(invocation ->
+                    connection.prepareTupleQuery(invocation.getArgument(1, String.class)).evaluate());
+            var environment = mock(Environment.class);
+            when(environment.getProperty("app.sparql.eli.namespace")).thenReturn(NAMESPACE);
+            var acts = mock(LegalActService.class);
+            when(acts.find(60, Year.of(2026), LocalDate.of(2026, 5, 27)))
+                    .thenReturn(Optional.of(new LegalAct(42L, 60, Year.of(2026), LocalDate.of(2026, 5, 27), "Act", null, null)));
+            var texts = mock(LegalActTextService.class);
+            var cachedChild = new LegalActText(7L, 42L, child, child, "paragraph", child);
+            when(texts.findByPathPrefix(actPath)).thenReturn(List.of(cachedChild));
+            when(texts.findByPath(child)).thenReturn(Optional.of(cachedChild));
+            when(texts.create(any())).thenAnswer(invocation -> invocation.getArgument(0));
+            var service = new LegalActSPARQLService(executor, environment, acts, texts);
+
+            assertThat(service.retrieveLegalActTexts(List.of(NAMESPACE + actPath)))
+                    .extracting(LegalActText::path).containsExactly(paragraph, child, sibling);
+            assertThat(service.retrieveLegalActTexts(List.of(NAMESPACE + paragraph)))
+                    .extracting(LegalActText::path).containsExactly(paragraph, child);
+            assertThat(service.retrieveLegalActTexts(List.of(NAMESPACE + child)))
+                    .containsExactly(cachedChild);
+            assertThat(service.retrieveLegalActTexts(List.of(NAMESPACE + actPath, NAMESPACE + paragraph)))
+                    .extracting(LegalActText::path).containsExactly(paragraph, child, sibling);
+        } finally {
+            repository.shutDown();
+        }
     }
 
     private BindingSet contentBinding(String path, String text, String hierarchy, String order) {
