@@ -81,6 +81,7 @@ public class FeedbackService {
 
     private boolean containsSuggestion(SuggestionJob job, String suggestionId) {
         return switch (job.kind()) {
+            case VOCABULARY -> job.vocabularyDraft().containsRef(suggestionId);
             case CLASS -> job.classSuggestions().stream()
                     .map(ClassSuggestion::suggestionID)
                     .anyMatch(suggestionId::equals);

@@ -23,7 +23,7 @@ class RelationshipSuggestionIntegrationTests extends AssistantIntegrationTest {
                                 {
                                   "k": 2,
                                   "selected_class_id": "class_001",
-                                  "structural_element_ids": ["/eli/cz/sb/2024/1/section/1", "/eli/cz/sb/2024/1/section/2"],
+                                  "structural_element_ids": ["/eli/cz/sb/2024/1/2024-01-01/section/1", "/eli/cz/sb/2024/1/2024-01-01/section/2"],
                                   "context_text": "Property rights",
                                   "known_conceptual_model": {
                                     "classes": [

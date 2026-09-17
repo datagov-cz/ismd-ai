@@ -9,6 +9,7 @@ import cz.dia.ismd.assistant.model.job.SuggestionJob;
 import cz.dia.ismd.assistant.model.suggestion.attribute.AttributeSuggestion;
 import cz.dia.ismd.assistant.model.suggestion.classsuggestion.ClassSuggestion;
 import cz.dia.ismd.assistant.model.suggestion.relationship.RelationshipSuggestion;
+import cz.dia.ismd.assistant.model.suggestion.vocabulary.VocabularyDraft;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,7 +97,7 @@ public class SuggestionJobRepository {
             case RELATIONSHIP -> relationships = deserializeSuggestions(suggestionsJson, RelationshipSuggestion.class);
         }
 
-        return new SuggestionJob(
+        SuggestionJob job = new SuggestionJob(
                 resultSet.getObject("job_id", UUID.class),
                 kind,
                 resultSet.getString("selected_class_id"),
@@ -106,6 +107,14 @@ public class SuggestionJobRepository {
                 attributes,
                 relationships
         );
+        if (kind == JobKind.VOCABULARY) {
+            try {
+                job.updateVocabularyDraft(objectMapper.readValue(suggestionsJson, VocabularyDraft.class));
+            } catch (JsonProcessingException exception) {
+                throw new IllegalStateException("Could not deserialize vocabulary job", exception);
+            }
+        }
+        return job;
     }
 
     private String serializeSuggestions(SuggestionJob job) {
@@ -113,6 +122,7 @@ public class SuggestionJobRepository {
             case CLASS -> job.classSuggestions();
             case PROPERTY -> job.attributeSuggestions();
             case RELATIONSHIP -> job.relationshipSuggestions();
+            case VOCABULARY -> job.vocabularyDraft();
         };
         try {
             return objectMapper.writeValueAsString(suggestions);

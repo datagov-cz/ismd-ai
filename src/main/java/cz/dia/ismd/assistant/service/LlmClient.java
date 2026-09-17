@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.MissingNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import cz.dia.ismd.assistant.model.llm.LlmProvider;
 import cz.dia.ismd.assistant.exception.LlmException;
 import cz.dia.ismd.assistant.model.llm.LlmCompletionRequest;
@@ -209,7 +210,7 @@ public class LlmClient {
                 body.put("system", systemPrompt(request));
                 body.put("messages", List.of(Map.of("role", "user", "content", prompt(request))));
                 Map<String, Object> outputConfig = new LinkedHashMap<>();
-                outputConfig.put("format", Map.of("type", "json_schema", "schema", schema));
+                outputConfig.put("format", anthropicResponseFormat(schema));
                 addAnthropicTuning(body, outputConfig);
                 body.put("stream", true);
                 headers = value -> {
@@ -493,13 +494,22 @@ public class LlmClient {
         body.put("system", systemPrompt(request));
         body.put("messages", List.of(Map.of("role", "user", "content", prompt(request))));
         Map<String, Object> outputConfig = new LinkedHashMap<>();
-        outputConfig.put("format", Map.of("type", "json_schema", "schema", schema));
+        outputConfig.put("format", anthropicResponseFormat(schema));
         addAnthropicTuning(body, outputConfig);
 
         return post(endpoint, body, headers -> {
             headers.set("x-api-key", properties.apiKey());
             headers.set("anthropic-version", ANTHROPIC_VERSION);
         });
+    }
+
+    private Map<String, Object> anthropicResponseFormat(JsonNode schema) {
+        JsonNode anthropicSchema = schema.deepCopy();
+        // Anthropic does not support maxItems; keep the original schema for other providers.
+        if (anthropicSchema.at("/properties/suggestions") instanceof ObjectNode suggestions) {
+            suggestions.remove("maxItems");
+        }
+        return Map.of("type", "json_schema", "schema", anthropicSchema);
     }
 
     private JsonNode postGoogle(URI endpoint, LlmCompletionRequest request) {

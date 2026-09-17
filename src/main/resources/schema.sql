@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS suggestion_jobs (
     job_id UUID PRIMARY KEY,
-    job_kind TEXT NOT NULL CHECK (job_kind IN ('CLASS', 'PROPERTY', 'RELATIONSHIP')),
+    job_kind TEXT NOT NULL CHECK (job_kind IN ('CLASS', 'PROPERTY', 'RELATIONSHIP', 'VOCABULARY')),
     selected_class_id TEXT,
     status TEXT NOT NULL CHECK (status IN ('IN_PROGRESS', 'COMPLETED', 'FAILED')),
     suggestions JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -55,3 +55,8 @@ CREATE TABLE IF NOT EXISTS legal_act_texts (
 CREATE INDEX IF NOT EXISTS idx_legal_acts_number_year_date ON legal_acts(number, year, date);
 CREATE INDEX IF NOT EXISTS idx_legal_act_texts_legal_act_id ON legal_act_texts(legal_act_id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_legal_act_texts_path ON legal_act_texts(path text_pattern_ops);
+
+-- Upgrade databases created before the aggregated vocabulary job was introduced.
+ALTER TABLE suggestion_jobs DROP CONSTRAINT IF EXISTS suggestion_jobs_job_kind_check;
+ALTER TABLE suggestion_jobs ADD CONSTRAINT suggestion_jobs_job_kind_check
+    CHECK (job_kind IN ('CLASS', 'PROPERTY', 'RELATIONSHIP', 'VOCABULARY'));

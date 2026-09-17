@@ -148,6 +148,17 @@ class LlmClientStructuredOutputTests {
         assertAcceptedStructuredStream(LlmProvider.OLLAMA, events, 31);
     }
 
+    @Test
+    void omitsSuggestionLimitFromAnthropicStreamSchema() throws Exception {
+        String events = "data: " + new ObjectMapper().writeValueAsString(
+                java.util.Map.of("type", "content_block_delta",
+                        "delta", java.util.Map.of("type", "text_delta", "text", STRUCTURED_CONTENT))) + "\n\n"
+                + "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},"
+                + "\"usage\":{\"output_tokens\":17}}\n\n";
+
+        assertAcceptedStructuredStream(LlmProvider.ANTHROPIC, events, 17);
+    }
+
     @ParameterizedTest
     @EnumSource(LlmProvider.class)
     void sendsProviderSpecificSchemaAndReturnsTypedSuggestions(LlmProvider provider) throws Exception {
@@ -171,16 +182,11 @@ class LlmClientStructuredOutputTests {
         );
         TokenUsageService tokenUsageService = mock(TokenUsageService.class);
         LlmClient client = new LlmClient(builder.build(), properties, objectMapper, tokenUsageService);
-        JsonNode schema = objectMapper.readTree("""
-                {
-                  "type": "object",
-                  "properties": {"suggestions": {"type": "array"}},
-                  "required": ["suggestions"]
-                }
-                """);
+        JsonNode schema = LlmRequestSupport.classSuggestionResponseSchema(objectMapper, 3);
+        JsonNode originalSchema = schema.deepCopy();
 
         server.expect(requestTo(endpoint))
-                .andExpect(jsonPath(schemaPath(provider)).exists())
+                .andExpect(suggestionLimitExpectation(provider))
                 .andExpect(maxTokensExpectation(provider))
                 .andExpect(jsonPath(temperaturePath(provider)).value(0.1))
                 .andExpect(interactionLoggingExpectation(provider))
@@ -202,6 +208,7 @@ class LlmClientStructuredOutputTests {
         assertThat(response.suggestions().get(0).name().values()).containsEntry("cs", "Osoba");
         verify(tokenUsageService).ensureRequestAllowed("test-user");
         verify(tokenUsageService).addOutputTokens("test-user", 17);
+        assertThat(schema).isEqualTo(originalSchema);
         server.verify();
     }
 
@@ -407,10 +414,10 @@ class LlmClientStructuredOutputTests {
                 512, null, null, null, Duration.ofSeconds(5), false);
         TokenUsageService tokenUsageService = mock(TokenUsageService.class);
         LlmClient client = new LlmClient(builder.build(), properties, objectMapper, tokenUsageService);
-        JsonNode schema = objectMapper.readTree("""
-                {"type":"object","properties":{"suggestions":{"type":"array"}},"required":["suggestions"]}
-                """);
+        JsonNode schema = LlmRequestSupport.classSuggestionResponseSchema(objectMapper, 3);
+        JsonNode originalSchema = schema.deepCopy();
         server.expect(requestTo(endpoint))
+                .andExpect(suggestionLimitExpectation(provider))
                 .andRespond(withSuccess(events, MediaType.TEXT_EVENT_STREAM));
 
         ClassSuggestionLlmResponse response = client.completeStructuredStreaming(
@@ -420,7 +427,15 @@ class LlmClientStructuredOutputTests {
 
         assertThat(response.suggestions()).hasSize(1);
         verify(tokenUsageService).addOutputTokens("test-user", expectedOutputTokens);
+        assertThat(schema).isEqualTo(originalSchema);
         server.verify();
+    }
+
+    private org.springframework.test.web.client.RequestMatcher suggestionLimitExpectation(LlmProvider provider) {
+        String path = schemaPath(provider) + ".properties.suggestions.maxItems";
+        return provider == LlmProvider.ANTHROPIC
+                ? jsonPath(path).doesNotExist()
+                : jsonPath(path).value(3);
     }
 
     private String schemaPath(LlmProvider provider) {

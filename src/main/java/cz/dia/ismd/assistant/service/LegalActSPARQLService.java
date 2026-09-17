@@ -1,6 +1,7 @@
 package cz.dia.ismd.assistant.service;
 
 import cz.dia.ismd.assistant.model.legal.LegalAct;
+import cz.dia.ismd.assistant.model.legal.LegalActEli;
 import cz.dia.ismd.assistant.model.legal.LegalActText;
 import org.eclipse.rdf4j.model.Value;
 
@@ -14,8 +15,6 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-import java.time.Year;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -55,31 +54,18 @@ public class LegalActSPARQLService {
 
     private static final String QUERY_LEGAL_ACT_CONTENT = """
             PREFIX esel: <https://slovník.gov.cz/datový/sbírka/pojem/>
-            SELECT ?zneni ?hierarchie ?poradi ?obsah
+            SELECT DISTINCT ?zneni ?hierarchie ?poradi ?obsah
             WHERE {
-              {
-                SELECT ?predek
-                WHERE {
-                  VALUES ?predek {
-                    %s
-                  }
-                }
+              VALUES ?source {
+                %s
               }
-
               {
-                SELECT ?predek ?zneni
-                WHERE {
-                  ?zneni esel:má-předka ?predek .
-                }
+                ?source esel:má-fragment-znění ?zneni .
               }
-              OPTION (
-                TRANSITIVE,
-                t_in(?predek),
-                t_out(?zneni),
-                t_min(0),
-                t_distinct,
-                t_no_cycles
-              )
+              UNION
+              {
+                ?zneni esel:má-předka* ?source .
+              }
 
               ?zneni
                 esel:hierarchie-fragmentu-znění-právního-aktu ?hierarchie ;
@@ -115,15 +101,21 @@ public class LegalActSPARQLService {
             return List.of();
         }
 
-        Map<String, ParsedEli> identifiersByPath = new LinkedHashMap<>();
+        Map<String, LegalActEli> identifiersByPath = new LinkedHashMap<>();
         for (String identifier : eliIdentifiers) {
-            ParsedEli parsed = parseEli(identifier);
+            LegalActEli parsed = LegalActEli.parse(identifier);
             identifiersByPath.putIfAbsent(parsed.path(), parsed);
         }
 
         Map<String, LegalActText> textsByPath = new LinkedHashMap<>();
-        List<ParsedEli> cacheMisses = new ArrayList<>();
-        for (ParsedEli identifier : identifiersByPath.values()) {
+        List<LegalActEli> cacheMisses = new ArrayList<>();
+        for (LegalActEli identifier : identifiersByPath.values()) {
+            // Cached fragments do not prove that the complete version was fetched.
+            // Resolve its full membership upstream and reuse existing rows below.
+            if (identifier.path().equals(identifier.legalActPath())) {
+                cacheMisses.add(identifier);
+                continue;
+            }
             List<LegalActText> cachedTexts = legalActTextService.findByPathPrefix(identifier.path());
             if (cachedTexts.isEmpty()) {
                 cacheMisses.add(identifier);
@@ -138,7 +130,7 @@ public class LegalActSPARQLService {
         List<LegalActFragment> fragments = retrieveLegalActFragments(cacheMisses);
         Map<String, Optional<LegalAct>> actsByPath = new LinkedHashMap<>();
         for (LegalActFragment fragment : fragments) {
-            ParsedEli fragmentEli = parseShortEli(fragment.path());
+            LegalActEli fragmentEli = LegalActEli.parsePath(fragment.path());
             Optional<LegalAct> storedAct = actsByPath.computeIfAbsent(
                     fragmentEli.legalActPath(),
                     ignored -> findOrCreateLegalAct(fragmentEli)
@@ -174,7 +166,7 @@ public class LegalActSPARQLService {
         return retrieveLegalActTexts(eliIdentifiers);
     }
 
-    private List<LegalActFragment> retrieveLegalActFragments(List<ParsedEli> identifiers) {
+    private List<LegalActFragment> retrieveLegalActFragments(List<LegalActEli> identifiers) {
         String namespace = eliNamespace();
         String values = identifiers.stream()
                 .map(identifier -> "<" + namespace + identifier.path() + ">")
@@ -209,7 +201,7 @@ public class LegalActSPARQLService {
     }
 
     public Optional<LegalAct> retrieveLegalActInfo(String legalActId) {
-        ParsedEli parsed = parseEli(legalActId);
+        LegalActEli parsed = LegalActEli.parse(legalActId);
         LegalAct legalAct = parsed.toLegalAct();
         String actELI = eliNamespace() + parsed.legalActPath();
         return sparqlQueryExecutor.query("legal act name query", repositoryConnection -> {
@@ -227,41 +219,13 @@ public class LegalActSPARQLService {
         });
     }
 
-    private Optional<LegalAct> findOrCreateLegalAct(ParsedEli parsed) {
+    private Optional<LegalAct> findOrCreateLegalAct(LegalActEli parsed) {
         Optional<LegalAct> cached = legalActService.find(parsed.number(), parsed.year(), parsed.date());
         if (cached.isPresent()) {
             return cached;
         }
         return retrieveLegalActInfo(ELI_PATH_PREFIX + parsed.path())
                 .map(legalActService::create);
-    }
-
-    private ParsedEli parseEli(String identifier) {
-        Objects.requireNonNull(identifier, "ELI identifier must not be null");
-        int prefixIndex = identifier.lastIndexOf(ELI_PATH_PREFIX);
-        if (prefixIndex < 0) {
-            throw new IllegalArgumentException("ELI identifier must contain " + ELI_PATH_PREFIX + ": " + identifier);
-        }
-        return parseShortEli(identifier.substring(prefixIndex + ELI_PATH_PREFIX.length()));
-    }
-
-    private ParsedEli parseShortEli(String path) {
-        if (path == null || path.isBlank() || !path.matches("[A-Za-z0-9_./-]+")) {
-            throw new IllegalArgumentException("ELI path contains unsupported characters: " + path);
-        }
-        String[] segments = path.split("/", -1);
-        if (segments.length < 3 || segments[0].length() != 4 || !segments[0].chars().allMatch(Character::isDigit)
-                || segments[1].isEmpty() || !segments[1].chars().allMatch(Character::isDigit)) {
-            throw new IllegalArgumentException("ELI path must start with {year}/{number}/{date}: " + path);
-        }
-        try {
-            Year year = Year.parse(segments[0]);
-            int number = Integer.parseInt(segments[1]);
-            LocalDate date = LocalDate.parse(segments[2]);
-            return new ParsedEli(path, year, number, date);
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("Unable to extract legal act year, number or date: " + path, exception);
-        }
     }
 
     private String eliNamespace() {
@@ -284,16 +248,6 @@ public class LegalActSPARQLService {
                 stringValue(bindingSet.getValue(bindingName)),
                 "SPARQL result is missing required binding: " + bindingName
         );
-    }
-
-    private record ParsedEli(String path, Year year, int number, LocalDate date) {
-        String legalActPath() {
-            return year + "/" + number + "/" + date;
-        }
-
-        LegalAct toLegalAct() {
-            return new LegalAct(number, year, date);
-        }
     }
 
     private record LegalActFragment(String path, String text, String hierarchy, String order) {
